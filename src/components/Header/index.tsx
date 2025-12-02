@@ -24,9 +24,15 @@ const Header = () => {
   const { data: categories } = useCategories();
   const { isAuthenticated, user, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const cartItems = useCartStore((state) => state.items);
   const totalPrice = useCartStore((state) => state.getTotalPrice());
+
+  // Prevent hydration mismatch by only showing cart count after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleOpenCartModal = () => {
     openCartModal();
@@ -356,7 +362,7 @@ const Header = () => {
                     </svg>
 
                     <span className="flex items-center justify-center font-medium text-2xs absolute -right-2 -top-2.5 bg-blue w-4.5 h-4.5 rounded-full text-white">
-                      {cartItems.length}
+                      {mounted ? cartItems.length : 0}
                     </span>
                   </span>
 
@@ -365,7 +371,7 @@ const Header = () => {
                       cart
                     </span>
                     <p className="font-medium text-custom-sm text-dark">
-                      ${totalPrice}
+                      ${mounted ? totalPrice.toFixed(2) : "0.00"}
                     </p>
                   </div>
                 </button>

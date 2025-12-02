@@ -4,6 +4,8 @@ import { CartModalProvider } from "../context/CartSidebarModalContext";
 import { PreviewSliderProvider } from "../context/PreviewSliderContext";
 import { QueryProvider } from "../providers/query-provider";
 import UserStatusChecker from "@/components/Auth/UserStatusChecker";
+import CartMerger from "@/components/Cart/CartMerger";
+import CartLoader from "@/components/Cart/CartLoader";
 
 /**
  * Client-side providers wrapper
@@ -16,6 +18,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <ModalProvider>
           <PreviewSliderProvider>
             <UserStatusChecker />
+            <CartLoader />
+            <CartMerger />
             {children}
           </PreviewSliderProvider>
         </ModalProvider>

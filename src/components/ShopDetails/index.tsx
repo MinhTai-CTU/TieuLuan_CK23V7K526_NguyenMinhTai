@@ -223,9 +223,27 @@ const ShopDetails = () => {
   }, [activeColor, storage, type, sim, product, findVariantByOptions]);
 
   // Calculate final price based on base price + selected option prices
+  // OR use variant price if product has variants
   const calculateFinalPrice = useCallback(() => {
-    if (!product) return { basePrice: 0, finalPrice: 0, additionalPrice: 0 };
+    if (!product) return { basePrice: 0, finalPrice: 0, additionalPrice: 0, baseDiscountedPrice: 0, finalDiscountedPrice: 0 };
 
+    // If product has variants, use variant price directly
+    if (product.hasVariants && product.variants && product.variants.length > 0) {
+      const variant = findVariantByOptions();
+      if (variant) {
+        return {
+          basePrice: variant.price,
+          finalPrice: variant.price,
+          baseDiscountedPrice: variant.discountedPrice ?? variant.price,
+          finalDiscountedPrice: variant.discountedPrice ?? variant.price,
+          additionalPrice: 0, // No additional price for variants
+        };
+      }
+      // If no variant found, return 0 (should not happen, but safe fallback)
+      return { basePrice: 0, finalPrice: 0, additionalPrice: 0, baseDiscountedPrice: 0, finalDiscountedPrice: 0 };
+    }
+
+    // For simple products (no variants), calculate from base price + option prices
     let additionalPrice = 0;
 
     // Add color price if selected
@@ -279,6 +297,7 @@ const ShopDetails = () => {
     types,
     sims,
     getColorPrice,
+    findVariantByOptions,
   ]);
 
   const priceCalculation = useMemo(
@@ -352,6 +371,9 @@ const ShopDetails = () => {
     const finalPrice = priceCalculation.finalPrice;
     const finalDiscountedPrice = priceCalculation.finalDiscountedPrice;
 
+    // Find variant if product has variants
+    const variant = product.hasVariants ? findVariantByOptions() : null;
+
     // Add to cart
     addItemToCart({
       id: product.id,
@@ -360,6 +382,7 @@ const ShopDetails = () => {
       price: finalPrice,
       discountedPrice: finalDiscountedPrice,
       quantity,
+      productVariantId: variant?.id || null,
       imgs: product.imgs,
       selectedOptions:
         Object.keys(selectedOptions).length > 0 ? selectedOptions : undefined,

@@ -1,14 +1,56 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import Discount from "./Discount";
 import OrderSummary from "./OrderSummary";
 import { useCartStore } from "@/stores/cart-store";
 import SingleItem from "./SingleItem";
 import Breadcrumb from "../Common/Breadcrumb";
 import Link from "next/link";
+import toast from "react-hot-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 
 const Cart = () => {
   const cartItems = useCartStore((state) => state.items);
+  const selectedItems = useCartStore((state) => state.selectedItems);
+  const selectAllItems = useCartStore((state) => state.selectAllItems);
+  const deselectAllItems = useCartStore((state) => state.deselectAllItems);
+  const removeAllItemsFromCart = useCartStore(
+    (state) => state.removeAllItemsFromCart
+  );
+  const [isClearing, setIsClearing] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Calculate if all items are selected
+  const isAllSelected =
+    cartItems.length > 0 &&
+    cartItems.every((item) => selectedItems.includes(item.cartItemId));
+
+  const handleClearCart = async () => {
+    if (cartItems.length === 0) return;
+
+    setIsClearing(true);
+    try {
+      await removeAllItemsFromCart();
+      toast.success("Shopping cart has been cleared", {
+        duration: 3000,
+        icon: "🗑️",
+      });
+      setIsDialogOpen(false);
+    } catch (error) {
+      toast.error("Failed to clear cart. Please try again.");
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   return (
     <>
@@ -22,14 +64,57 @@ const Cart = () => {
           <div className="max-w-[1170px] w-full mx-auto px-4 sm:px-8 xl:px-0">
             <div className="flex flex-wrap items-center justify-between gap-5 mb-7.5">
               <h2 className="font-medium text-dark text-2xl">Your Cart</h2>
-              <button className="text-blue">Clear Shopping Cart</button>
+              <button
+                onClick={() => setIsDialogOpen(true)}
+                disabled={cartItems.length === 0}
+                className="text-blue hover:text-blue-dark disabled:opacity-50 disabled:cursor-not-allowed ease-out duration-200"
+              >
+                Clear Shopping Cart
+              </button>
+
+              <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Clear Shopping Cart</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to clear all items from your cart?
+                      This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleClearCart}
+                      disabled={isClearing}
+                    >
+                      {isClearing ? "Clearing..." : "Clear Cart"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
 
             <div className="bg-white rounded-[10px] shadow-1">
-              <div className="w-full overflow-x-auto">
+              <div className="w-full overflow-x-auto xl:overflow-x-hidden">
                 <div className="min-w-[1170px]">
                   {/* <!-- table header --> */}
                   <div className="flex items-center py-5.5 px-7.5">
+                    {/* Select All Checkbox */}
+                    <div className="min-w-[50px] flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={() => {
+                          if (isAllSelected) {
+                            deselectAllItems();
+                          } else {
+                            selectAllItems();
+                          }
+                        }}
+                        className="w-5 h-5 rounded border-gray-3 text-blue focus:ring-blue cursor-pointer"
+                      />
+                    </div>
+
                     <div className="min-w-[400px]">
                       <p className="text-dark">Product</p>
                     </div>
@@ -38,16 +123,16 @@ const Cart = () => {
                       <p className="text-dark">Price</p>
                     </div>
 
-                    <div className="min-w-[275px]">
+                    <div className="min-w-[250px]">
                       <p className="text-dark">Quantity</p>
                     </div>
 
-                    <div className="min-w-[200px]">
+                    <div className="min-w-[150px]">
                       <p className="text-dark">Subtotal</p>
                     </div>
 
-                    <div className="min-w-[50px]">
-                      <p className="text-dark text-right">Action</p>
+                    <div className="min-w-[125px]">
+                      <p className="text-dark text-left">Action</p>
                     </div>
                   </div>
 

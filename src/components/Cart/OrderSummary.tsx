@@ -1,9 +1,17 @@
-import React from "react";
+"use client";
+import React, { useEffect, useState } from "react";
 import { useCartStore } from "@/stores/cart-store";
 
 const OrderSummary = () => {
   const cartItems = useCartStore((state) => state.items);
-  const totalPrice = useCartStore((state) => state.getTotalPrice());
+  const selectedItems = useCartStore((state) => state.selectedItems);
+  const totalPrice = useCartStore((state) => state.getSelectedTotalPrice()); // Use selected total price
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch by only showing cart data after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <div className="lg:max-w-[455px] w-full">
@@ -25,21 +33,30 @@ const OrderSummary = () => {
           </div>
 
           {/* <!-- product item --> */}
-          {cartItems.map((item, key) => (
-            <div
-              key={key}
-              className="flex items-center justify-between py-5 border-b border-gray-3"
-            >
-              <div>
-                <p className="text-dark">{item.title}</p>
-              </div>
-              <div>
-                <p className="text-dark text-right">
-                  ${item.discountedPrice * item.quantity}
-                </p>
-              </div>
+          {mounted &&
+            cartItems
+              .filter((item) => selectedItems.includes(item.cartItemId))
+              .map((item, key) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between py-5 border-b border-gray-3"
+                >
+                  <div>
+                    <p className="text-dark">{item.title}</p>
+                  </div>
+                  <div>
+                    <p className="text-dark text-right">
+                      ${item.discountedPrice * item.quantity}
+                    </p>
+                  </div>
+                </div>
+              ))}
+
+          {mounted && selectedItems.length === 0 && (
+            <div className="flex items-center justify-center py-5">
+              <p className="text-gray-500">No items selected</p>
             </div>
-          ))}
+          )}
 
           {/* <!-- total --> */}
           <div className="flex items-center justify-between pt-5">
@@ -48,7 +65,7 @@ const OrderSummary = () => {
             </div>
             <div>
               <p className="font-medium text-lg text-dark text-right">
-                ${totalPrice}
+                ${mounted ? totalPrice.toFixed(2) : "0.00"}
               </p>
             </div>
           </div>

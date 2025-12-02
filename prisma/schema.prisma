@@ -31,6 +31,7 @@ model User {
   orders    Order[]
   addresses Address[]
   wishlist  WishlistItem[]
+  cartItems CartItem[]
   userRoles UserRole[]
 
   @@unique([provider, providerId]) // Unique constraint for OAuth providers
@@ -136,6 +137,7 @@ model Product {
   images      ProductImage[]
   orderItems  OrderItem[]
   wishlist    WishlistItem[]
+  cartItems   CartItem[]
   
   // Relation tới bảng biến thể
   variants    ProductVariant[]
@@ -186,6 +188,7 @@ model ProductVariant {
   updatedAt       DateTime @updatedAt
   
   orderItems      OrderItem[] // Quan hệ để biết đơn hàng mua biến thể nào
+  cartItems       CartItem[] // Quan hệ với cart items
   promotionTargets PromotionTarget[] // Quan hệ với promotion targets
   
   @@map("product_variants")
@@ -287,6 +290,24 @@ model WishlistItem {
 
   @@unique([userId, productId])
   @@map("wishlist_items")
+}
+
+model CartItem {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productVariantId String? // Nullable for simple products
+  productVariant  ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  quantity        Int      @default(1)
+  selectedOptions Json?    // Store selected options (color, storage, etc.)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Unique constraint: one cart item per user per product/variant combination
+  @@unique([userId, productId, productVariantId], name: "userId_productId_productVariantId")
+  @@map("cart_items")
 }
 
 model Blog {

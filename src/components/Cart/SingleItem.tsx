@@ -1,30 +1,48 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useCartStore } from "@/stores/cart-store";
-
 import Image from "next/image";
+import toast from "react-hot-toast";
 
 const SingleItem = ({ item }) => {
-  const [quantity, setQuantity] = useState(item.quantity);
   const removeItemFromCart = useCartStore((state) => state.removeItemFromCart);
   const updateCartItemQuantity = useCartStore(
     (state) => state.updateCartItemQuantity
   );
+  const toggleItemSelection = useCartStore(
+    (state) => state.toggleItemSelection
+  );
+  const selectedItems = useCartStore((state) => state.selectedItems);
+  const [mounted, setMounted] = useState(false);
 
-  const handleRemoveFromCart = () => {
-    removeItemFromCart(item.cartItemId);
+  // Get current quantity from store (it will be updated after API call)
+  const cartItems = useCartStore((state) => state.items);
+  const currentItem = cartItems.find((i) => i.cartItemId === item.cartItemId);
+  const quantity = currentItem?.quantity ?? item.quantity;
+  const isSelected = selectedItems.includes(item.cartItemId);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const handleRemoveFromCart = async () => {
+    try {
+      await removeItemFromCart(item.cartItemId);
+      toast.success(`${item.title} has been removed from the cart`, {
+        duration: 3000,
+        icon: "🗑️",
+      });
+    } catch (error) {
+      toast.error("Cannot remove product. Please try again.");
+    }
   };
 
-  const handleIncreaseQuantity = () => {
-    setQuantity(quantity + 1);
-    updateCartItemQuantity(item.cartItemId, quantity + 1);
+  const handleIncreaseQuantity = async () => {
+    await updateCartItemQuantity(item.cartItemId, quantity + 1);
   };
 
-  const handleDecreaseQuantity = () => {
+  const handleDecreaseQuantity = async () => {
     if (quantity > 1) {
-      setQuantity(quantity - 1);
-      updateCartItemQuantity(item.cartItemId, quantity - 1);
-    } else {
-      return;
+      await updateCartItemQuantity(item.cartItemId, quantity - 1);
     }
   };
 
@@ -52,6 +70,25 @@ const SingleItem = ({ item }) => {
 
   return (
     <div className="flex items-center border-t border-gray-3 py-5 px-7.5">
+      {/* Checkbox */}
+      <div className="min-w-[50px] flex items-center justify-center">
+        {mounted ? (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => toggleItemSelection(item.cartItemId)}
+            className="w-5 h-5 rounded border-gray-3 text-blue focus:ring-blue cursor-pointer"
+          />
+        ) : (
+          <input
+            type="checkbox"
+            checked={false}
+            readOnly
+            className="w-5 h-5 rounded border-gray-3 text-blue focus:ring-blue cursor-pointer"
+          />
+        )}
+      </div>
+
       <div className="min-w-[400px]">
         <div className="flex items-center justify-between gap-5">
           <div className="w-full flex items-center gap-5.5">
@@ -80,7 +117,7 @@ const SingleItem = ({ item }) => {
         <p className="text-dark">${item.discountedPrice}</p>
       </div>
 
-      <div className="min-w-[275px]">
+      <div className="min-w-[250px]">
         <div className="w-max flex items-center rounded-md border border-gray-3">
           <button
             onClick={() => handleDecreaseQuantity()}
@@ -132,11 +169,11 @@ const SingleItem = ({ item }) => {
         </div>
       </div>
 
-      <div className="min-w-[200px]">
+      <div className="min-w-[150px]">
         <p className="text-dark">${item.discountedPrice * quantity}</p>
       </div>
 
-      <div className="min-w-[50px] flex justify-end">
+      <div className="min-w-[125px] flex justify-start">
         <button
           onClick={() => handleRemoveFromCart()}
           aria-label="button for remove product from cart"

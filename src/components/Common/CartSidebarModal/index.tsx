@@ -11,6 +11,12 @@ const CartSidebarModal = () => {
   const { isCartModalOpen, closeCartModal } = useCartModalContext();
   const cartItems = useCartStore((state) => state.items);
   const totalPrice = useCartStore((state) => state.getTotalPrice());
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch by only showing cart data after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     // closing modal while clicking outside
@@ -71,10 +77,12 @@ const CartSidebarModal = () => {
           <div className="h-[66vh] overflow-y-auto no-scrollbar">
             <div className="flex flex-col gap-6">
               {/* <!-- cart item --> */}
-              {cartItems.length > 0 ? (
+              {mounted && cartItems.length > 0 ? (
                 cartItems.map((item, key) => (
                   <SingleItem key={key} item={item} />
                 ))
+              ) : mounted ? (
+                <EmptyCart />
               ) : (
                 <EmptyCart />
               )}
@@ -85,7 +93,9 @@ const CartSidebarModal = () => {
             <div className="flex items-center justify-between gap-5 mb-6">
               <p className="font-medium text-xl text-dark">Subtotal:</p>
 
-              <p className="font-medium text-xl text-dark">${totalPrice}</p>
+              <p className="font-medium text-xl text-dark">
+                ${mounted ? totalPrice.toFixed(2) : "0.00"}
+              </p>
             </div>
 
             <div className="flex items-center gap-4">
