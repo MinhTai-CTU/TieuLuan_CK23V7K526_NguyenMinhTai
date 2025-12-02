@@ -1,0 +1,396 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String?
+  password          String?   // Nullable for OAuth users
+  provider          String?   // "google", "facebook", or null for email/password
+  providerId        String?   // OAuth provider user ID
+  avatar            String?   // URL to avatar image
+  dateOfBirth       DateTime? // Date of birth (dd/MM/yyyy format in frontend)
+  emailVerified     Boolean   @default(false) // Email verification status
+  verificationToken String?   // Token for email verification
+  verifiedAt        DateTime? // When email was verified
+  isActive          Boolean   @default(true) // User account status (active/banned)
+  bannedAt          DateTime? // When user was banned
+  bannedReason      String?   // Reason for ban
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  orders    Order[]
+  addresses Address[]
+  wishlist  WishlistItem[]
+  userRoles UserRole[]
+
+  @@unique([provider, providerId]) // Unique constraint for OAuth providers
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique // CUSTOMER, STAFF, ADMIN
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userRoles      UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g., "products.create", "orders.view", "users.manage"
+  description String?
+  resource    String   // e.g., "products", "orders", "users"
+  action      String   // e.g., "create", "read", "update", "delete", "manage"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+// Many-to-many: User <-> Role
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+// Many-to-many: Role <-> Permission
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  img         String?
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  title           String
+  slug            String   @unique
+  description     String?  @db.Text
+  
+  // --- GIÁ & KHO (Mặc định cho sản phẩm đơn) ---
+  price           Float
+  discountedPrice Float?
+  stock           Int      @default(0)
+  
+  // --- CỜ ĐÁNH DẤU ---
+  // Nếu true: Bỏ qua price/stock ở bảng này, lấy ở bảng ProductVariant
+  hasVariants     Boolean  @default(false)
+  
+  reviews         Int      @default(0)
+  isActive        Boolean  @default(true)
+  categoryId      String?
+  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  // --- THUỘC TÍNH HIỂN THỊ ---
+  // Dùng để render UI. VD: { "Colors": ["Red", "Blue"], "RAM": ["64GB", "256GB"] }
+  attributes      Json?    // Flexible attributes like colors, storage, type, sim, etc.
+  additionalInfo  Json?    // Additional information like brand, model, specifications, etc.
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  images      ProductImage[]
+  orderItems  OrderItem[]
+  wishlist    WishlistItem[]
+  
+  // Relation tới bảng biến thể
+  variants    ProductVariant[]
+  
+  // Relation tới promotion targets
+  promotionTargets PromotionTarget[]
+
+  @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  type      ImageType @default(THUMBNAIL)
+  createdAt DateTime @default(now())
+
+  @@map("product_images")
+}
+
+enum ImageType {
+  THUMBNAIL
+  PREVIEW
+}
+
+// === MODEL MỚI: QUẢN LÝ BIẾN THỂ (SKU) ===
+model ProductVariant {
+  id              String   @id @default(cuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  // Giá và Kho riêng cho từng biến thể
+  price           Float
+  discountedPrice Float?
+  stock           Int      @default(0)
+  
+  // SKU code để quản lý kho (VD: IPHONE-13-RED-64)
+  sku             String?  @unique
+  
+  // Lưu cụ thể option của biến thể này
+  // VD: { "color": "Red", "storage": "64GB" }
+  options         Json
+  
+  // Ảnh riêng cho biến thể (VD: chọn màu đỏ thì hiện ảnh đỏ)
+  image           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  orderItems      OrderItem[] // Quan hệ để biết đơn hàng mua biến thể nào
+  promotionTargets PromotionTarget[] // Quan hệ với promotion targets
+  
+  @@map("product_variants")
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  orderId    String      @unique
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  status     OrderStatus @default(PENDING)
+  total      Float
+  promotionCode String?   // Mã khuyến mãi đã áp dụng
+  discountAmount Float?   // Tổng số tiền được giảm
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  items      OrderItem[]
+  shipping   Shipping?
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model OrderItem {
+  id                String   @id @default(cuid())
+  orderId           String
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId         String
+  product           Product  @relation(fields: [productId], references: [id])
+  
+  // === CẬP NHẬT: THÊM LIÊN KẾT TỚI VARIANT ===
+  productVariantId String? // Nullable vì nếu mua sp đơn giản thì không có variant
+  productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
+  
+  quantity          Int
+  
+  // Lưu giá tại thời điểm mua (Snapshot price)
+  price             Float
+  discountedPrice   Float?
+  
+  // Lưu option đã chọn vào đây luôn để dễ hiển thị lịch sử đơn hàng mà ko cần join nhiều
+  // VD: { "color": "Red", "storage": "64GB" } hoặc "Màu: Đỏ, RAM: 64GB"
+  selectedOptions   Json?
+  createdAt         DateTime @default(now())
+
+  @@map("order_items")
+}
+
+model Shipping {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fullName    String
+  email       String
+  phone       String?
+  address     String   @db.Text
+  city        String
+  postalCode  String?
+  country     String
+  method      String?
+  createdAt   DateTime @default(now())
+
+  @@map("shipping")
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName   String
+  phone      String?
+  address    String   @db.Text
+  city       String
+  postalCode String?
+  country    String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("addresses")
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@map("wishlist_items")
+}
+
+model Blog {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  content   String?  @db.Text
+  excerpt   String?
+  img       String?
+  views     Int      @default(0)
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("blogs")
+}
+
+model Testimonial {
+  id         String   @id @default(cuid())
+  review     String   @db.Text
+  authorName String
+  authorRole String?
+  authorImg  String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("testimonials")
+}
+
+// === HỆ THỐNG MÃ KHUYẾN MÃI (PROMOTION/COUPON) ===
+
+enum PromotionScope {
+  GLOBAL_ORDER    // Giảm giá toàn bộ đơn hàng
+  SPECIFIC_ITEMS  // Giảm giá cho sản phẩm/variant cụ thể
+}
+
+enum PromotionType {
+  PERCENTAGE  // Giảm theo phần trăm
+  FIXED       // Giảm số tiền cố định
+}
+
+model Promotion {
+  id          String          @id @default(cuid())
+  code        String          @unique // Mã khuyến mãi (VD: HELLO30, GHE100, APPLEFAN)
+  name        String?         // Tên chương trình khuyến mãi
+  description String?         @db.Text
+  
+  // Phạm vi áp dụng
+  scope       PromotionScope  // GLOBAL_ORDER hoặc SPECIFIC_ITEMS
+  
+  // Loại giảm giá
+  type        PromotionType   // PERCENTAGE hoặc FIXED
+  
+  // Giá trị giảm giá (mặc định)
+  value       Float           // VD: 30 (30%), hoặc 50000 (50k VNĐ)
+  
+  // Giới hạn tối đa (chỉ dùng cho GLOBAL_ORDER)
+  maxDiscount Float?          // VD: 500000 (tối đa 500k)
+  
+  // Thời gian hiệu lực
+  startDate   DateTime
+  endDate     DateTime
+  
+  // Giới hạn sử dụng
+  usageLimit  Int?            // Tổng số lần có thể sử dụng (null = không giới hạn)
+  usedCount   Int             @default(0) // Số lần đã sử dụng
+  
+  // Giới hạn cho từng user
+  perUserLimit Int?           // Mỗi user chỉ được dùng tối đa bao nhiêu lần (null = không giới hạn)
+  
+  // Điều kiện tối thiểu
+  minOrderValue Float?        // Giá trị đơn hàng tối thiểu để áp dụng
+  
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  // Quan hệ với các target cụ thể
+  targets     PromotionTarget[]
+  
+  @@map("promotions")
+}
+
+// Bảng lưu các target cụ thể cho promotion (sản phẩm hoặc variant)
+model PromotionTarget {
+  id            String     @id @default(cuid())
+  promotionId   String
+  promotion     Promotion  @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  
+  // Target có thể là Product hoặc ProductVariant
+  productId     String?    // Target là sản phẩm đơn (nullable)
+  product       Product?   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  variantId     String?    // Target là variant cụ thể (nullable)
+  variant       ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  
+  // Giá trị giảm riêng cho target này (nếu null thì dùng value của Promotion)
+  specificValue Float?     // VD: 5 (5%), 10 (10%)
+  
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  
+  // Đảm bảo mỗi target chỉ có 1 promotion (product hoặc variant, không cả hai)
+  @@map("promotion_targets")
+}
+
