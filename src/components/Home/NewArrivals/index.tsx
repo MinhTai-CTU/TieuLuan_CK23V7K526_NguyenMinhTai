@@ -3,17 +3,15 @@ import React, { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import ProductItem from "@/components/Common/ProductItem";
-import shopData from "@/components/Shop/shopData";
 import { useProducts } from "@/hooks/queries/useProducts";
 
 const NewArrival = () => {
-  const { data, isLoading, isError } = useProducts({ limit: 8 });
-  const products = useMemo(() => {
-    if (data && data.length > 0) {
-      return data;
-    }
-    return shopData;
-  }, [data]);
+  const {
+    data: productsData,
+    isLoading,
+    isError,
+  } = useProducts({ limit: 8, sort: "newest" });
+  const products = productsData?.products || [];
 
   return (
     <section className="overflow-hidden pt-15">
@@ -41,10 +39,10 @@ const NewArrival = () => {
                   strokeLinecap="round"
                 />
               </svg>
-              This Week’s
+              Hôm nay
             </span>
             <h2 className="font-semibold text-xl xl:text-heading-5 text-dark">
-              New Arrivals
+              Sản phẩm mới
             </h2>
           </div>
 
@@ -52,7 +50,7 @@ const NewArrival = () => {
             href="/shop-with-sidebar"
             className="inline-flex font-medium text-custom-sm py-2.5 px-7 rounded-md border-gray-3 border bg-gray-1 text-dark ease-out duration-200 hover:bg-dark hover:text-white hover:border-transparent"
           >
-            View All
+            Xem tất cả
           </Link>
         </div>
 
@@ -65,11 +63,19 @@ const NewArrival = () => {
                   className="h-72 rounded-2xl bg-gray-2 animate-pulse"
                 />
               ))
-            : products.map((item) => <ProductItem item={item} key={item.id} />)}
+            : products && products.length > 0
+              ? products.map((item) => (
+                  <ProductItem item={item} key={item.id} />
+                ))
+              : !isLoading && (
+                  <div className="col-span-full text-center py-12">
+                    <p className="text-dark-4">Không có sản phẩm mới</p>
+                  </div>
+                )}
         </div>
         {isError && (
           <p className="text-sm text-red-500 mt-6">
-            Unable to load latest arrivals. Showing demo data instead.
+            Không thể tải sản phẩm mới. Vui lòng thử lại sau.
           </p>
         )}
       </div>

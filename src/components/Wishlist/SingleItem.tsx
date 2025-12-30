@@ -1,30 +1,54 @@
+"use client";
 import React from "react";
-import { useWishlistStore } from "@/stores/wishlist-store";
+import {
+  useRemoveFromWishlist,
+  type WishlistItem,
+} from "@/hooks/queries/useWishlist";
 import { useCartStore, generateCartItemId } from "@/stores/cart-store";
-
 import Image from "next/image";
+import Link from "next/link";
+import { formatPrice } from "@/utils/formatPrice";
 
-const SingleItem = ({ item }) => {
-  const removeItemFromWishlist = useWishlistStore(
-    (state) => state.removeItemFromWishlist
-  );
+interface SingleItemProps {
+  item: WishlistItem;
+}
+
+const SingleItem: React.FC<SingleItemProps> = ({ item }) => {
+  const removeFromWishlist = useRemoveFromWishlist();
   const addItemToCart = useCartStore((state) => state.addItemToCart);
 
   const handleRemoveFromWishlist = () => {
-    removeItemFromWishlist(item.id);
+    removeFromWishlist.mutate({
+      productId: item.productId,
+      productVariantId: item.productVariantId || null,
+      selectedOptions: item.selectedOptions || null,
+    });
   };
 
   const handleAddToCart = () => {
+    // Convert selectedOptions from display format (titles) to IDs if needed
+    // For now, we'll use selectedOptions as-is since they might already be in the correct format
+    const selectedOptionsForId = item.selectedOptions || {};
+
     addItemToCart({
-      id: item.id,
-      cartItemId: generateCartItemId(item.id),
+      id: item.productId,
+      cartItemId: generateCartItemId(
+        item.productId,
+        selectedOptionsForId,
+        item.productVariantId || null
+      ),
       title: item.title,
       price: item.price,
-      discountedPrice: item.discountedPrice,
+      discountedPrice: item.discountedPrice ?? item.price,
       quantity: 1,
+      productVariantId: item.productVariantId || null,
       imgs: item.imgs,
+      selectedOptions: item.selectedOptions || undefined,
     });
   };
+
+  const stockStatus = item.stock > 0 ? "Còn hàng" : "Hết hàng";
+  const stockStatusColor = item.stock > 0 ? "text-green" : "text-red";
 
   return (
     <div className="flex items-center border-t border-gray-3 py-5 px-10">
@@ -61,16 +85,19 @@ const SingleItem = ({ item }) => {
           <div className="w-full flex items-center gap-5.5">
             <div className="flex items-center justify-center rounded-[5px] bg-gray-2 max-w-[80px] w-full h-17.5">
               <Image
-                src={item.imgs?.thumbnails[0]}
-                alt="product"
-                width={200}
-                height={200}
+                src={item.imgs?.thumbnails?.[0] || "/images/placeholder.png"}
+                alt={item.title}
+                width={80}
+                height={80}
+                className="object-contain"
               />
             </div>
 
             <div>
               <h3 className="text-dark ease-out duration-200 hover:text-blue">
-                <a href="#"> {item.title} </a>
+                <Link href={`/shop-details?id=${item.productId}`}>
+                  {item.title}
+                </Link>
               </h3>
             </div>
           </div>
@@ -78,11 +105,40 @@ const SingleItem = ({ item }) => {
       </div>
 
       <div className="min-w-[205px]">
-        <p className="text-dark">${item.discountedPrice}</p>
+        <div className="flex items-center gap-2">
+          <span className="text-dark font-medium">
+            {formatPrice(item.discountedPrice ?? item.price)}
+          </span>
+          {item.discountedPrice && item.discountedPrice < item.price && (
+            <span className="text-dark-4 line-through text-sm">
+              {formatPrice(item.price)}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="min-w-[265px]">
         <div className="flex items-center gap-1.5">
+          {item.stock > 0 ? (
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M10 0.5625C4.78125 0.5625 0.5625 4.78125 0.5625 10C0.5625 15.2188 4.78125 19.4688 10 19.4688C15.2188 19.4688 19.4688 15.2188 19.4688 10C19.4688 4.78125 15.2188 0.5625 10 0.5625ZM10 18.0625C5.5625 18.0625 1.96875 14.4375 1.96875 10C1.96875 5.5625 5.5625 1.96875 10 1.96875C14.4375 1.96875 18.0625 5.59375 18.0625 10.0312C18.0625 14.4375 14.4375 18.0625 10 18.0625Z"
+                fill="#22AD5C"
+              />
+              <path
+                d="M12.6875 7.09374L8.9688 10.7187L7.2813 9.06249C7.00005 8.78124 6.56255 8.81249 6.2813 9.06249C6.00005 9.34374 6.0313 9.78124 6.2813 10.0625L8.2813 12C8.4688 12.1875 8.7188 12.2812 8.9688 12.2812C9.2188 12.2812 9.4688 12.1875 9.6563 12L13.6875 8.12499C13.9688 7.84374 13.9688 7.40624 13.6875 7.12499C13.4063 6.84374 12.9688 6.84374 12.6875 7.09374Z"
+                fill="#22AD5C"
+              />
+            </svg>
+          ) : (
           <svg
             width="20"
             height="20"
@@ -105,8 +161,9 @@ const SingleItem = ({ item }) => {
               fill="#F23030"
             />
           </svg>
+          )}
 
-          <span className="text-red"> Out of Stock </span>
+          <span className={stockStatusColor}>{stockStatus}</span>
         </div>
       </div>
 
@@ -115,7 +172,7 @@ const SingleItem = ({ item }) => {
           onClick={() => handleAddToCart()}
           className="inline-flex text-dark hover:text-white bg-gray-1 border border-gray-3 py-2.5 px-6 rounded-md ease-out duration-200 hover:bg-blue hover:border-gray-3"
         >
-          Add to Cart
+          Thêm vào giỏ hàng
         </button>
       </div>
     </div>

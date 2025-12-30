@@ -39,8 +39,11 @@ export async function GET(request: NextRequest) {
         email: true,
         name: true,
         avatar: true,
+        phone: true,
         dateOfBirth: true,
+        gender: true,
         emailVerified: true,
+        provider: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -62,6 +65,7 @@ export async function GET(request: NextRequest) {
         user: {
           ...user,
           dateOfBirth: user.dateOfBirth?.toISOString() || null,
+          createdAt: user.createdAt?.toISOString() || null,
         },
       },
     });
@@ -107,7 +111,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, dateOfBirth, avatar } = body;
+    const { name, phone, dateOfBirth, gender, avatar } = body;
 
     // Build update data
     const updateData: any = {};
@@ -131,8 +135,16 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    if (phone !== undefined) {
+      updateData.phone = phone || null;
+    }
+
     if (dateOfBirth !== undefined) {
       updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+    }
+
+    if (gender !== undefined) {
+      updateData.gender = gender || null;
     }
 
     // If avatar is explicitly provided (from upload), use it
@@ -148,8 +160,11 @@ export async function PUT(request: NextRequest) {
         email: true,
         name: true,
         avatar: true,
+        phone: true,
         dateOfBirth: true,
+        gender: true,
         emailVerified: true,
+        createdAt: true,
         updatedAt: true,
       },
     });
@@ -161,6 +176,7 @@ export async function PUT(request: NextRequest) {
         user: {
           ...updatedUser,
           dateOfBirth: updatedUser.dateOfBirth?.toISOString() || null,
+          createdAt: updatedUser.createdAt?.toISOString() || null,
         },
       },
     });

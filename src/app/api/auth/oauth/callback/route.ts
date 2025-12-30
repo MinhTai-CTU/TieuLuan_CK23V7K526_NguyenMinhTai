@@ -71,11 +71,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Return token
-    return NextResponse.json({
+    // Create response with token
+    const response = NextResponse.json({
       success: true,
       token,
     });
+
+    // Set cookie for server-side access
+    const isProduction = process.env.NODE_ENV === "production";
+    response.cookies.set("auth_token", token, {
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      sameSite: "lax",
+      secure: isProduction,
+    });
+
+    return response;
   } catch (error: any) {
     console.error("OAuth callback error:", error);
     return NextResponse.json(

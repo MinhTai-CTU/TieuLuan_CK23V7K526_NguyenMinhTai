@@ -1,24 +1,37 @@
 "use client";
 import Breadcrumb from "@/components/Common/Breadcrumb";
 import Link from "next/link";
-import { useState, FormEvent, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { saveToken, saveUser } from "@/lib/auth-storage";
 import { useAuth } from "@/hooks/useAuth";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import {
+  signinSchema,
+  type SigninFormData,
+} from "@/utils/validation/authRules";
 
 const Signin = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { updateUser } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
-    {}
-  );
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SigninFormData>({
+    resolver: yupResolver(signinSchema) as any,
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
   // Handle OAuth callback
   useEffect(() => {
@@ -49,11 +62,25 @@ const Signin = () => {
             });
             updateUser(data.data.user);
 
-            toast.success("Login successful! Welcome back!");
+            toast.success("Đăng nhập thành công! Chào mừng bạn trở lại!");
 
-            // Redirect to home
+            // Get returnUrl from query params (support both 'redirect' and 'returnUrl'), localStorage, or default to home
+            const returnUrl =
+              searchParams.get("redirect") ||
+              searchParams.get("returnUrl") ||
+              (typeof window !== "undefined"
+                ? localStorage.getItem("oauth_returnUrl")
+                : null) ||
+              "/";
+
+            // Clear returnUrl from localStorage if it was there
+            if (typeof window !== "undefined") {
+              localStorage.removeItem("oauth_returnUrl");
+            }
+
+            // Redirect to returnUrl or home
             setTimeout(() => {
-              router.push("/");
+              router.push(returnUrl);
               setTimeout(() => {
                 router.refresh();
               }, 100);
@@ -62,38 +89,12 @@ const Signin = () => {
         })
         .catch((error) => {
           console.error("Error fetching user data:", error);
-          toast.error("Failed to complete login. Please try again.");
+          toast.error("Không thể hoàn tất đăng nhập. Vui lòng thử lại.");
         });
     }
   }, [searchParams, router, updateUser]);
 
-  const validateForm = () => {
-    const newErrors: { email?: string; password?: string } = {};
-
-    if (!email) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = "Please enter a valid email";
-    }
-
-    if (!password) {
-      newErrors.password = "Password is required";
-    } else if (password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      toast.error("Please fix the errors in the form");
-      return;
-    }
-
+  const onSubmit = async (data: SigninFormData) => {
     setIsLoading(true);
 
     try {
@@ -102,35 +103,35 @@ const Signin = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: data.email, password: data.password }),
       });
 
-      const data = await response.json();
+      const result = await response.json();
 
-      if (!response.ok || !data.success) {
+      if (!response.ok || !result.success) {
         // Handle different error cases
-        if (data.requiresVerification) {
+        if (result.requiresVerification) {
           toast.error(
-            data.error || "Please verify your email before logging in."
+            result.error || "Vui lòng xác minh email trước khi đăng nhập."
           );
-        } else if (data.isBanned) {
+        } else if (result.isBanned) {
           toast.error(
-            data.error ||
-              "Your account has been banned. Please contact support.",
+            result.error ||
+              "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hỗ trợ.",
             { duration: 5000 }
           );
         } else {
-          toast.error(data.error || "Login failed. Please try again.");
+          toast.error(result.error || "Đăng nhập thất bại. Vui lòng thử lại.");
         }
         // Don't throw error, just return to stop execution
         return;
       }
 
       // Save token and user to localStorage
-      if (data.data.token) {
-        saveToken(data.data.token);
-        saveUser(data.data.user);
-        updateUser(data.data.user); // Update auth state
+      if (result.data.token) {
+        saveToken(result.data.token);
+        saveUser(result.data.user);
+        updateUser(result.data.user); // Update auth state
 
         // Dispatch custom event to notify all components
         if (typeof window !== "undefined") {
@@ -138,11 +139,22 @@ const Signin = () => {
         }
       }
 
-      toast.success("Login successful! Welcome back!");
+      toast.success("Đăng nhập thành công! Chào mừng bạn trở lại!");
 
-      // Redirect to home page
+      // Get returnUrl from query params (support both 'redirect' and 'returnUrl')
+      const returnUrl =
+        searchParams.get("redirect") || searchParams.get("returnUrl") || "/";
+
+      // Ensure cookie is set for server-side access
+      if (result.data.token && typeof window !== "undefined") {
+        document.cookie = `auth_token=${result.data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+      }
+
+      // Redirect to returnUrl or home page
+      // Note: If redirecting to /checkout, the Checkout component will handle
+      // waiting for cart to load before rendering
       setTimeout(() => {
-        router.push("/");
+        router.push(returnUrl);
         // Small delay to ensure state is updated before redirect
         setTimeout(() => {
           router.refresh();
@@ -152,7 +164,7 @@ const Signin = () => {
       console.error("Login error:", error);
       // Only show toast for network errors or unexpected errors
       // API errors are already handled above
-      toast.error("An unexpected error occurred. Please try again.");
+      toast.error("Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.");
     } finally {
       setIsLoading(false);
     }
@@ -172,7 +184,7 @@ const Signin = () => {
             </div>
 
             <div>
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit(onSubmit)}>
                 <div className="mb-5">
                   <label htmlFor="email" className="block mb-2.5">
                     Email
@@ -180,15 +192,8 @@ const Signin = () => {
 
                   <input
                     type="email"
-                    name="email"
                     id="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      if (errors.email) {
-                        setErrors({ ...errors, email: undefined });
-                      }
-                    }}
+                    {...register("email")}
                     placeholder="Enter your email"
                     className={`rounded-lg border ${
                       errors.email ? "border-red" : "border-gray-3"
@@ -196,7 +201,9 @@ const Signin = () => {
                     disabled={isLoading}
                   />
                   {errors.email && (
-                    <p className="text-red text-sm mt-1">{errors.email}</p>
+                    <p className="text-red text-sm mt-1">
+                      {errors.email.message}
+                    </p>
                   )}
                 </div>
 
@@ -207,15 +214,8 @@ const Signin = () => {
 
                   <input
                     type="password"
-                    name="password"
                     id="password"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (errors.password) {
-                        setErrors({ ...errors, password: undefined });
-                      }
-                    }}
+                    {...register("password")}
                     placeholder="Enter your password"
                     autoComplete="on"
                     className={`rounded-lg border ${
@@ -224,7 +224,9 @@ const Signin = () => {
                     disabled={isLoading}
                   />
                   {errors.password && (
-                    <p className="text-red text-sm mt-1">{errors.password}</p>
+                    <p className="text-red text-sm mt-1">
+                      {errors.password.message}
+                    </p>
                   )}
                 </div>
 
@@ -277,11 +279,16 @@ const Signin = () => {
                 <div className="flex flex-col gap-4.5 mt-4.5">
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      // Save returnUrl to localStorage before OAuth
+                      const returnUrl = searchParams.get("returnUrl");
+                      if (returnUrl) {
+                        localStorage.setItem("oauth_returnUrl", returnUrl);
+                      }
                       signIn("google", {
                         callbackUrl: `${window.location.origin}/oauth-callback`,
-                      })
-                    }
+                      });
+                    }}
                     className="flex justify-center items-center gap-3.5 rounded-lg border border-gray-3 bg-gray-1 p-3 ease-out duration-200 hover:bg-gray-2"
                     disabled={isLoading}
                   >
@@ -333,11 +340,16 @@ const Signin = () => {
 
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      // Save returnUrl to localStorage before OAuth
+                      const returnUrl = searchParams.get("returnUrl");
+                      if (returnUrl) {
+                        localStorage.setItem("oauth_returnUrl", returnUrl);
+                      }
                       signIn("facebook", {
                         callbackUrl: `${window.location.origin}/oauth-callback`,
-                      })
-                    }
+                      });
+                    }}
                     className="flex justify-center items-center gap-3.5 rounded-lg border border-gray-3 bg-gray-1 p-3 ease-out duration-200 hover:bg-gray-2"
                     disabled={isLoading}
                   >

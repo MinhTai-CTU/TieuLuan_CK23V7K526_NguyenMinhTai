@@ -1,28 +1,22 @@
 "use client";
-import React, { useMemo } from "react";
-import SingleItem from "./SingleItem";
+import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import shopData from "@/components/Shop/shopData";
 import { useProducts } from "@/hooks/queries/useProducts";
 import ProductItem from "@/components/Common/ProductItem";
 
 const BestSeller = () => {
   // Fetch best sellers (products sorted by reviews, limit 6)
-  const { data: products, isLoading, isError } = useProducts({ limit: 6 });
-
-  const displayProducts = useMemo(() => {
-    if (products && products.length > 0) {
-      // Sort by reviews (best sellers)
-      return [...products]
-        .sort((a, b) => (b.reviews || 0) - (a.reviews || 0))
-        .slice(0, 6);
-    }
-    return shopData.slice(1, 7);
-  }, [products]);
+  const {
+    data: productsData,
+    isLoading,
+    isError,
+  } = useProducts({ limit: 6, sort: "bestseller" });
+  const products = productsData?.products || [];
+  const displayProducts = products;
 
   return (
-    <section className="overflow-hidden">
+    <section className="overflow-hidden py-10">
       <div className="max-w-[1170px] w-full mx-auto px-4 sm:px-8 xl:px-0">
         {/* <!-- section title --> */}
         <div className="mb-10 flex items-center justify-between">
@@ -34,10 +28,10 @@ const BestSeller = () => {
                 width={17}
                 height={17}
               />
-              This Month
+              Tháng này
             </span>
             <h2 className="font-semibold text-xl xl:text-heading-5 text-dark">
-              Best Sellers
+              Sản phẩm bán chạy
             </h2>
           </div>
         </div>
@@ -51,18 +45,24 @@ const BestSeller = () => {
               />
             ))}
           </div>
-        ) : (
+        ) : displayProducts && displayProducts.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-7.5">
             {/* <!-- Best Sellers item --> */}
             {displayProducts.map((item) => (
               <ProductItem item={item} key={item.id} />
             ))}
           </div>
+        ) : (
+          !isLoading && (
+            <div className="text-center py-12">
+              <p className="text-dark-4">Không có sản phẩm bán chạy</p>
+            </div>
+          )
         )}
 
         {isError && (
           <p className="text-sm text-red-500 mt-4">
-            Unable to load best sellers. Showing demo data instead.
+            Không thể tải sản phẩm bán chạy. Vui lòng thử lại sau.
           </p>
         )}
       </div>
@@ -72,7 +72,7 @@ const BestSeller = () => {
           href="/shop-without-sidebar"
           className="inline-flex font-medium text-custom-sm py-3 px-7 sm:px-12.5 rounded-md border-gray-3 border bg-gray-1 text-dark ease-out duration-200 hover:bg-dark hover:text-white hover:border-transparent"
         >
-          View All
+          Xem tất cả
         </Link>
       </div>
     </section>

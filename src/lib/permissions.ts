@@ -130,7 +130,7 @@ export const PERMISSIONS = {
   REVIEWS_CREATE: "reviews.create",
   PROFILE_MANAGE: "profile.manage",
 
-  // Staff
+  // Admin permissions (products, categories, orders, etc.)
   PRODUCTS_CREATE: "products.create",
   PRODUCTS_UPDATE: "products.update",
   PRODUCTS_DELETE: "products.delete",
@@ -154,6 +154,5 @@ export const PERMISSIONS = {
  */
 export const ROLES = {
   CUSTOMER: "CUSTOMER",
-  STAFF: "STAFF",
   ADMIN: "ADMIN",
 } as const;

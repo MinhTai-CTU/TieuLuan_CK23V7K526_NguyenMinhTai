@@ -3,13 +3,16 @@ import React, { use, useEffect, useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Breadcrumb from "../Common/Breadcrumb";
 import Image from "next/image";
-import Newsletter from "../Common/Newsletter";
 import RecentlyViewdItems from "./RecentlyViewd";
 import { usePreviewSlider } from "@/app/context/PreviewSliderContext";
 import { useProductDetailsStore } from "@/stores/product-details-store";
 import { useProduct } from "@/hooks/queries/useProduct";
 import { useCartStore, generateCartItemId } from "@/stores/cart-store";
+import { formatPrice } from "@/utils/formatPrice";
 import toast from "react-hot-toast";
+import WishlistButton from "../Common/WishlistButton";
+import ReviewsSection from "./ReviewsSection";
+import { addToRecentlyViewed } from "@/utils/recentlyViewed";
 
 const ShopDetails = () => {
   const searchParams = useSearchParams();
@@ -29,23 +32,28 @@ const ShopDetails = () => {
 
   const [activeTab, setActiveTab] = useState("tabOne");
 
+  // Reviews state
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
   const tabs = [
     {
       id: "tabOne",
-      title: "Description",
+      title: "Mô tả",
     },
     {
       id: "tabTwo",
-      title: "Additional Information",
+      title: "Thông tin bổ sung",
     },
     {
       id: "tabThree",
-      title: "Reviews",
+      title: "Đánh giá",
     },
   ];
 
   // Fetch product from API if productId is provided
   const { data: apiProduct, isLoading, isError } = useProduct(productId);
+  console.log("apiProduct", apiProduct);
 
   // Fallback to Zustand/localStorage for backward compatibility
   const productFromStorage = useProductDetailsStore((state) => state.value);
@@ -75,12 +83,113 @@ const ShopDetails = () => {
     return fallbackProduct;
   }, [apiProduct, fallbackProduct]);
 
+  // Memoize handleReviewsUpdate to prevent infinite loop
+  const handleReviewsUpdate = useCallback((updatedReviews: any[]) => {
+    setReviews(updatedReviews);
+  }, []);
+
+  // Save product to recently viewed
+  useEffect(() => {
+    if (product?.id && product?.title) {
+      addToRecentlyViewed(product);
+    }
+  }, [product?.id, product?.title]);
+
+  // Fetch reviews for product
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!product?.id) return;
+
+      setReviewsLoading(true);
+      try {
+        const response = await fetch(`/api/products/${product.id}/reviews`);
+        const result = await response.json();
+        if (result.success) {
+          setReviews(result.data);
+        }
+      } catch (error) {
+        console.error("Error fetching reviews:", error);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    fetchReviews();
+  }, [product?.id]);
+
+  // Calculate rating stats
+  const ratingStats = useMemo(() => {
+    if (reviews.length === 0) {
+      return {
+        averageRating: 0,
+        totalReviews: 0,
+        hasReviews: false,
+      };
+    }
+
+    const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+    const averageRating = totalRating / reviews.length;
+
+    return {
+      averageRating,
+      totalReviews: reviews.length,
+      hasReviews: true,
+    };
+  }, [reviews]);
+
   useEffect(() => {
     if (product && product.id) {
       localStorage.setItem("productDetails", JSON.stringify(product));
       // Initialize images from product
-      if (product.imgs) {
-        setCurrentImages(product.imgs);
+      // Priority: product.images (from API) > product.imgs (legacy)
+      if (
+        product.images &&
+        Array.isArray(product.images) &&
+        product.images.length > 0
+      ) {
+        console.log("📸 Processing product.images:", product.images);
+        // Separate THUMBNAIL and PREVIEW images
+        const thumbnailImages = product.images.filter(
+          (img: any) => img.type === "THUMBNAIL"
+        );
+        const previewImages = product.images.filter(
+          (img: any) => img.type === "PREVIEW"
+        );
+
+        console.log("🖼️ Thumbnail images:", thumbnailImages);
+        console.log("🖼️ Preview images:", previewImages);
+
+        // Combine: THUMBNAIL first, then PREVIEW
+        // Ensure THUMBNAIL is always included in thumbnails gallery
+        const allImageUrls = [
+          ...thumbnailImages.map((img: any) => img.url),
+          ...previewImages.map((img: any) => img.url),
+        ];
+
+        console.log("✅ All image URLs (THUMBNAIL + PREVIEW):", allImageUrls);
+
+        setCurrentImages({
+          previews: allImageUrls,
+          thumbnails: allImageUrls, // Include both THUMBNAIL and PREVIEW in thumbnails
+        });
+        // Reset preview to first image (thumbnail)
+        setPreviewImg(0);
+      } else if (product.imgs) {
+        console.log("📸 Using legacy product.imgs:", product.imgs);
+        // Handle legacy format: combine thumbnails and previews
+        const legacyThumbnails = product.imgs.thumbnails || [];
+        const legacyPreviews = product.imgs.previews || [];
+
+        // Combine: thumbnails first, then previews
+        const allLegacyImages = [...legacyThumbnails, ...legacyPreviews];
+
+        console.log("✅ Combined legacy images:", allLegacyImages);
+
+        setCurrentImages({
+          previews: allLegacyImages,
+          thumbnails: allLegacyImages, // Include both thumbnails and previews
+        });
+        setPreviewImg(0);
       }
     }
   }, [product]);
@@ -90,33 +199,68 @@ const ShopDetails = () => {
     () => product?.attributes || null,
     [product?.attributes]
   );
-  // Normalize colors - handle both string array and object array
+  // Normalize colors - handle both string array (legacy) and ProductColor object array
   const colors = useMemo(() => {
     const colorsData = attributes?.colors || [];
-    return colorsData.map(
-      (color: string | { id: string; title: string; price?: number }) => {
-        if (typeof color === "string") {
-          return color;
-        }
-        return color.id || color.title || "";
+    return colorsData.map((color: any) => {
+      if (typeof color === "string") {
+        // Legacy string format - return as is for backward compatibility
+        return color;
       }
-    );
+      // ProductColor object format: { id, label, hex, price? }
+      return color.id || "";
+    });
   }, [attributes?.colors]);
+
+  // Get color object by id or value (for backward compatibility)
+  const getColorObject = useCallback(
+    (colorValue: string) => {
+      const colorsData = attributes?.colors || [];
+      return colorsData.find(
+        (c: any) =>
+          (typeof c === "object" &&
+            (c.id === colorValue || c.label === colorValue)) ||
+          (typeof c === "string" && c === colorValue)
+      );
+    },
+    [attributes?.colors]
+  );
 
   // Get color price if it's an object
   const getColorPrice = useCallback(
     (colorValue: string): number => {
-      const colorsData = attributes?.colors || [];
-      const colorObj = colorsData.find(
-        (c: any) =>
-          typeof c === "object" &&
-          (c.id === colorValue || c.title === colorValue)
-      );
+      const colorObj = getColorObject(colorValue);
       return typeof colorObj === "object" && colorObj?.price
         ? colorObj.price
         : 0;
     },
-    [attributes?.colors]
+    [getColorObject]
+  );
+
+  // Get color hex for display
+  const getColorHex = useCallback(
+    (colorValue: string): string => {
+      const colorObj = getColorObject(colorValue);
+      if (typeof colorObj === "object" && colorObj?.hex) {
+        return colorObj.hex;
+      }
+      // Fallback for legacy string colors
+      return "#808080"; // Default gray
+    },
+    [getColorObject]
+  );
+
+  // Get color label for display
+  const getColorLabel = useCallback(
+    (colorValue: string): string => {
+      const colorObj = getColorObject(colorValue);
+      if (typeof colorObj === "object" && colorObj?.label) {
+        return colorObj.label;
+      }
+      // Fallback for legacy string colors
+      return typeof colorObj === "string" ? colorObj : colorValue;
+    },
+    [getColorObject]
   );
 
   const storages = useMemo(
@@ -152,31 +296,60 @@ const ShopDetails = () => {
     if (storage) {
       const storageOption = storages.find((s) => s.id === storage);
       if (storageOption) {
-        selectedOptions.storage = storageOption.title;
+        // Try both title and id for matching
+        selectedOptions.storage = storageOption.title || storageOption.id;
       }
     }
     if (type) {
       const typeOption = types.find((t) => t.id === type);
       if (typeOption) {
-        selectedOptions.type = typeOption.title;
+        selectedOptions.type = typeOption.title || typeOption.id;
       }
     }
     if (sim) {
       const simOption = sims.find((s) => s.id === sim);
       if (simOption) {
-        selectedOptions.sim = simOption.title;
+        selectedOptions.sim = simOption.title || simOption.id;
       }
     }
 
-    // Find matching variant
+    // Find matching variant - only compare selected options, not all variant options
     const matchingVariant = product.variants.find((variant) => {
       const variantOptions = variant.options || {};
-      return Object.keys(selectedOptions).every(
-        (key) => variantOptions[key] === selectedOptions[key]
-      );
+      // Check if all selected options match variant options
+      return Object.keys(selectedOptions).every((key) => {
+        const selectedValue = selectedOptions[key];
+        const variantValue = variantOptions[key];
+        // Normalize comparison - handle both string and object values
+        return (
+          variantValue === selectedValue ||
+          String(variantValue) === String(selectedValue) ||
+          (variantValue && variantValue.toString() === selectedValue.toString())
+        );
+      });
     });
 
-    return matchingVariant || null;
+    // If no exact match found, try to find variant with at least one matching option
+    // This handles cases where variant structure might differ slightly
+    if (!matchingVariant && Object.keys(selectedOptions).length > 0) {
+      const partialMatch = product.variants.find((variant) => {
+        const variantOptions = variant.options || {};
+        return Object.keys(selectedOptions).some((key) => {
+          const selectedValue = selectedOptions[key];
+          const variantValue = variantOptions[key];
+          return (
+            variantValue === selectedValue ||
+            String(variantValue) === String(selectedValue)
+          );
+        });
+      });
+      if (partialMatch) {
+        return partialMatch;
+      }
+    }
+
+    // Fallback to first variant if no match found (to prevent showing 0 price)
+    return matchingVariant || product.variants[0] || null;
   }, [
     product,
     activeColor,
@@ -195,8 +368,8 @@ const ShopDetails = () => {
 
     const variant = findVariantByOptions();
 
+    // Priority 1: Use variant image if available
     if (variant && variant.image) {
-      // Use variant image if available
       const variantImage = variant.image;
       setCurrentImages({
         previews: [variantImage],
@@ -209,9 +382,83 @@ const ShopDetails = () => {
         image: variantImage,
         options: variant.options,
       });
+      return;
+    }
+
+    // Priority 2: If variant exists but no image, try to find image by color
+    // Note: This requires product images to be organized by color in the future
+    // For now, we'll use product images as fallback
+    if (variant && !variant.image) {
+      // Convert product.images (from API) or product.imgs (legacy) to currentImages format
+      let productImages: string[] = [];
+      if (
+        product.images &&
+        Array.isArray(product.images) &&
+        product.images.length > 0
+      ) {
+        // Separate THUMBNAIL and PREVIEW, then combine
+        const thumbnailImages = product.images.filter(
+          (img: any) => img.type === "THUMBNAIL"
+        );
+        const previewImages = product.images.filter(
+          (img: any) => img.type === "PREVIEW"
+        );
+        productImages = [
+          ...thumbnailImages.map((img: any) => img.url),
+          ...previewImages.map((img: any) => img.url),
+        ];
+      } else if (product.imgs) {
+        // Handle legacy format: combine thumbnails and previews
+        const legacyThumbnails = product.imgs.thumbnails || [];
+        const legacyPreviews = product.imgs.previews || [];
+        productImages = [...legacyThumbnails, ...legacyPreviews];
+      }
+
+      if (productImages.length > 0) {
+        setCurrentImages({
+          previews: productImages,
+          thumbnails: productImages,
+        });
+        setPreviewImg(0);
+        console.log("📦 Using product images (variant has no image):", {
+          variantId: variant.id,
+          color: activeColor,
+          options: variant.options,
+        });
+        return;
+      }
+    }
+
+    // Priority 3: Fallback to product images
+    let productImages: string[] = [];
+    if (
+      product.images &&
+      Array.isArray(product.images) &&
+      product.images.length > 0
+    ) {
+      // Separate THUMBNAIL and PREVIEW, then combine
+      const thumbnailImages = product.images.filter(
+        (img: any) => img.type === "THUMBNAIL"
+      );
+      const previewImages = product.images.filter(
+        (img: any) => img.type === "PREVIEW"
+      );
+      productImages = [
+        ...thumbnailImages.map((img: any) => img.url),
+        ...previewImages.map((img: any) => img.url),
+      ];
     } else if (product.imgs) {
-      // Fallback to product images
-      setCurrentImages(product.imgs);
+      // Handle legacy format: combine thumbnails and previews
+      const legacyThumbnails = product.imgs.thumbnails || [];
+      const legacyPreviews = product.imgs.previews || [];
+      productImages = [...legacyThumbnails, ...legacyPreviews];
+    }
+
+    if (productImages.length > 0) {
+      setCurrentImages({
+        previews: productImages,
+        thumbnails: productImages,
+      });
       setPreviewImg(0);
       console.log("📦 Product images loaded (no variant match):", {
         color: activeColor,
@@ -225,22 +472,124 @@ const ShopDetails = () => {
   // Calculate final price based on base price + selected option prices
   // OR use variant price if product has variants
   const calculateFinalPrice = useCallback(() => {
-    if (!product) return { basePrice: 0, finalPrice: 0, additionalPrice: 0, baseDiscountedPrice: 0, finalDiscountedPrice: 0 };
+    if (!product)
+      return {
+        basePrice: 0,
+        finalPrice: 0,
+        additionalPrice: 0,
+        baseDiscountedPrice: 0,
+        finalDiscountedPrice: 0,
+      };
 
-    // If product has variants, use variant price directly
-    if (product.hasVariants && product.variants && product.variants.length > 0) {
+    // If product has variants, use variant price + additional option prices
+    if (
+      product.hasVariants &&
+      product.variants &&
+      product.variants.length > 0
+    ) {
       const variant = findVariantByOptions();
       if (variant) {
+        // Calculate additional price from options (storage, type, sim) that are NOT already in variant
+        // Variant price already includes prices for options that are part of the variant
+        // So we should NOT add their prices again
+        let additionalPrice = 0;
+        const variantOptions = variant.options || {};
+
+        // Helper function to check if an option is already in variant
+        const isOptionInVariant = (
+          optionKey: string,
+          optionValue: any
+        ): boolean => {
+          const variantValue = variantOptions[optionKey];
+          if (!variantValue) return false;
+
+          // Compare both as strings to handle id vs title matching
+          const variantStr = String(variantValue).trim();
+          const optionStr = String(optionValue).trim();
+
+          return variantStr === optionStr;
+        };
+
+        // Add storage price ONLY if selected and NOT already in variant
+        if (storage) {
+          const storageOption = storages.find((s) => s.id === storage);
+          if (storageOption?.price) {
+            // Check if storage is already in variant options (compare both id and title)
+            const storageInVariant =
+              isOptionInVariant("storage", storageOption.id) ||
+              isOptionInVariant("storage", storageOption.title);
+
+            if (!storageInVariant) {
+              additionalPrice += storageOption.price;
+            }
+          }
+        }
+
+        // Add type price ONLY if selected and NOT already in variant
+        if (type) {
+          const typeOption = types.find((t) => t.id === type);
+          if (typeOption?.price) {
+            // Check if type is already in variant options (compare both id and title)
+            const typeInVariant =
+              isOptionInVariant("type", typeOption.id) ||
+              isOptionInVariant("type", typeOption.title);
+
+            if (!typeInVariant) {
+              additionalPrice += typeOption.price;
+            }
+          }
+        }
+
+        // Add sim price ONLY if selected and NOT already in variant
+        if (sim) {
+          const simOption = sims.find((s) => s.id === sim);
+          if (simOption?.price) {
+            // Check if sim is already in variant options (compare both id and title)
+            const simInVariant =
+              isOptionInVariant("sim", simOption.id) ||
+              isOptionInVariant("sim", simOption.title);
+
+            if (!simInVariant) {
+              additionalPrice += simOption.price;
+            }
+          }
+        }
+
+        const basePrice = variant.price || 0;
+        const baseDiscountedPrice =
+          variant.discountedPrice ?? variant.price ?? 0;
+        const finalPrice = basePrice + additionalPrice;
+        const finalDiscountedPrice = baseDiscountedPrice + additionalPrice;
+
         return {
-          basePrice: variant.price,
-          finalPrice: variant.price,
-          baseDiscountedPrice: variant.discountedPrice ?? variant.price,
-          finalDiscountedPrice: variant.discountedPrice ?? variant.price,
-          additionalPrice: 0, // No additional price for variants
+          basePrice,
+          finalPrice,
+          baseDiscountedPrice,
+          finalDiscountedPrice,
+          additionalPrice,
         };
       }
-      // If no variant found, return 0 (should not happen, but safe fallback)
-      return { basePrice: 0, finalPrice: 0, additionalPrice: 0, baseDiscountedPrice: 0, finalDiscountedPrice: 0 };
+      // Fallback to first variant if no match found (to prevent showing 0 price)
+      const firstVariant = product.variants[0];
+      if (firstVariant) {
+        return {
+          basePrice: firstVariant.price || 0,
+          finalPrice: firstVariant.price || 0,
+          baseDiscountedPrice:
+            firstVariant.discountedPrice ?? firstVariant.price ?? 0,
+          finalDiscountedPrice:
+            firstVariant.discountedPrice ?? firstVariant.price ?? 0,
+          additionalPrice: 0,
+        };
+      }
+      // Last resort fallback
+      return {
+        basePrice: 0,
+        finalPrice: 0,
+        additionalPrice: 0,
+        baseDiscountedPrice: 0,
+        finalDiscountedPrice: 0,
+      };
     }
 
     // For simple products (no variants), calculate from base price + option prices
@@ -308,7 +657,9 @@ const ShopDetails = () => {
   // Initialize state with first available option
   useEffect(() => {
     if (colors.length > 0 && !activeColor) {
-      setActiveColor(colors[0]);
+      const firstColor = colors[0];
+      // colors array already contains normalized id strings, so use directly
+      setActiveColor(String(firstColor));
     }
     if (storages.length > 0 && !storage) {
       setStorage(storages[0].id);
@@ -337,20 +688,36 @@ const ShopDetails = () => {
   // Handle add to cart with selected options
   const handleAddToCart = () => {
     if (!product || !product.id) {
-      toast.error("Product information is missing");
+      toast.error("Thiếu thông tin sản phẩm");
       return;
     }
 
+    // Normalize color value to string (handle both string and object)
+    let normalizedColor = "";
+    if (activeColor) {
+      if (typeof activeColor === "object" && activeColor !== null) {
+        normalizedColor = String(
+          (activeColor as any).id || (activeColor as any).title || activeColor
+        );
+      } else {
+        normalizedColor = String(activeColor);
+      }
+    }
+
     // Collect selected options with their IDs for cartItemId generation
+    // IMPORTANT: Use normalized string values to ensure consistent cartItemId generation
     const selectedOptionsForId: Record<string, string> = {};
-    if (activeColor) selectedOptionsForId.color = activeColor;
-    if (storage) selectedOptionsForId.storage = storage;
-    if (type) selectedOptionsForId.type = type;
-    if (sim) selectedOptionsForId.sim = sim;
+    if (normalizedColor) selectedOptionsForId.color = normalizedColor;
+    if (storage) selectedOptionsForId.storage = String(storage);
+    if (type) selectedOptionsForId.type = String(type);
+    if (sim) selectedOptionsForId.sim = String(sim);
 
     // Collect selected options with labels (titles) for display
     const selectedOptions: Record<string, string> = {};
-    if (activeColor) selectedOptions.color = activeColor;
+    if (normalizedColor) {
+      // For display, use getColorLabel to get the label
+      selectedOptions.color = getColorLabel(normalizedColor);
+    }
     if (storage) {
       const storageOption = storages.find((s) => s.id === storage);
       selectedOptions.storage = storageOption?.title || storage;
@@ -364,15 +731,22 @@ const ShopDetails = () => {
       selectedOptions.sim = simOption?.title || sim;
     }
 
-    // Generate unique cart item ID using IDs (not labels)
-    const cartItemId = generateCartItemId(product.id, selectedOptionsForId);
-
     // Calculate final price with selected options
     const finalPrice = priceCalculation.finalPrice;
     const finalDiscountedPrice = priceCalculation.finalDiscountedPrice;
 
     // Find variant if product has variants
     const variant = product.hasVariants ? findVariantByOptions() : null;
+
+    // Generate unique cart item ID
+    // For products with variants: use productId + variantId
+    // For products with options but no variant: use productId + options
+    // For products without options/variant: use productId only
+    const cartItemId = generateCartItemId(
+      product.id,
+      selectedOptionsForId,
+      variant?.id || null
+    );
 
     // Add to cart
     addItemToCart({
@@ -383,17 +757,38 @@ const ShopDetails = () => {
       discountedPrice: finalDiscountedPrice,
       quantity,
       productVariantId: variant?.id || null,
-      imgs: product.imgs,
+      imgs:
+        product.images &&
+        Array.isArray(product.images) &&
+        product.images.length > 0
+          ? (() => {
+              // Separate THUMBNAIL and PREVIEW, then combine
+              const thumbnailImages = product.images.filter(
+                (img: any) => img.type === "THUMBNAIL"
+              );
+              const previewImages = product.images.filter(
+                (img: any) => img.type === "PREVIEW"
+              );
+              const imageUrls = [
+                ...thumbnailImages.map((img: any) => img.url),
+                ...previewImages.map((img: any) => img.url),
+              ];
+              return {
+                previews: imageUrls,
+                thumbnails: imageUrls,
+              };
+            })()
+          : product.imgs,
       selectedOptions:
         Object.keys(selectedOptions).length > 0 ? selectedOptions : undefined,
     });
 
-    toast.success("Product added to cart!");
+    toast.success("Đã thêm sản phẩm vào giỏ hàng!");
   };
 
   return (
     <>
-      <Breadcrumb title={"Shop Details"} pages={["shop details"]} />
+      <Breadcrumb title={"Chi tiết sản phẩm"} pages={["shop details"]} />
 
       {isLoading ? (
         <section className="overflow-hidden relative pb-20 pt-5 lg:pt-20 xl:pt-28">
@@ -503,123 +898,49 @@ const ShopDetails = () => {
                     <h2 className="font-semibold text-xl sm:text-2xl xl:text-custom-3 text-dark">
                       {product.title}
                     </h2>
-
-                    <div className="inline-flex font-medium text-custom-sm text-white bg-blue rounded py-0.5 px-2.5">
-                      30% OFF
-                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-5.5 mb-4.5">
                     <div className="flex items-center gap-2.5">
                       {/* <!-- stars --> */}
-                      <div className="flex items-center gap-1">
-                        <svg
-                          className="fill-[#FFA645]"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 18 18"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <g clipPath="url(#clip0_375_9172)">
-                            <path
-                              d="M16.7906 6.72187L11.7 5.93438L9.39377 1.09688C9.22502 0.759375 8.77502 0.759375 8.60627 1.09688L6.30002 5.9625L1.23752 6.72187C0.871891 6.77812 0.731266 7.25625 1.01252 7.50938L4.69689 11.3063L3.82502 16.6219C3.76877 16.9875 4.13439 17.2969 4.47189 17.0719L9.05627 14.5687L13.6125 17.0719C13.9219 17.2406 14.3156 16.9594 14.2313 16.6219L13.3594 11.3063L17.0438 7.50938C17.2688 7.25625 17.1563 6.77812 16.7906 6.72187Z"
-                              fill=""
-                            />
-                          </g>
-                          <defs>
-                            <clipPath id="clip0_375_9172">
-                              <rect width="18" height="18" fill="white" />
-                            </clipPath>
-                          </defs>
-                        </svg>
-
-                        <svg
-                          className="fill-[#FFA645]"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 18 18"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <g clipPath="url(#clip0_375_9172)">
-                            <path
-                              d="M16.7906 6.72187L11.7 5.93438L9.39377 1.09688C9.22502 0.759375 8.77502 0.759375 8.60627 1.09688L6.30002 5.9625L1.23752 6.72187C0.871891 6.77812 0.731266 7.25625 1.01252 7.50938L4.69689 11.3063L3.82502 16.6219C3.76877 16.9875 4.13439 17.2969 4.47189 17.0719L9.05627 14.5687L13.6125 17.0719C13.9219 17.2406 14.3156 16.9594 14.2313 16.6219L13.3594 11.3063L17.0438 7.50938C17.2688 7.25625 17.1563 6.77812 16.7906 6.72187Z"
-                              fill=""
-                            />
-                          </g>
-                          <defs>
-                            <clipPath id="clip0_375_9172">
-                              <rect width="18" height="18" fill="white" />
-                            </clipPath>
-                          </defs>
-                        </svg>
-
-                        <svg
-                          className="fill-[#FFA645]"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 18 18"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <g clipPath="url(#clip0_375_9172)">
-                            <path
-                              d="M16.7906 6.72187L11.7 5.93438L9.39377 1.09688C9.22502 0.759375 8.77502 0.759375 8.60627 1.09688L6.30002 5.9625L1.23752 6.72187C0.871891 6.77812 0.731266 7.25625 1.01252 7.50938L4.69689 11.3063L3.82502 16.6219C3.76877 16.9875 4.13439 17.2969 4.47189 17.0719L9.05627 14.5687L13.6125 17.0719C13.9219 17.2406 14.3156 16.9594 14.2313 16.6219L13.3594 11.3063L17.0438 7.50938C17.2688 7.25625 17.1563 6.77812 16.7906 6.72187Z"
-                              fill=""
-                            />
-                          </g>
-                          <defs>
-                            <clipPath id="clip0_375_9172">
-                              <rect width="18" height="18" fill="white" />
-                            </clipPath>
-                          </defs>
-                        </svg>
-
-                        <svg
-                          className="fill-[#FFA645]"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 18 18"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <g clipPath="url(#clip0_375_9172)">
-                            <path
-                              d="M16.7906 6.72187L11.7 5.93438L9.39377 1.09688C9.22502 0.759375 8.77502 0.759375 8.60627 1.09688L6.30002 5.9625L1.23752 6.72187C0.871891 6.77812 0.731266 7.25625 1.01252 7.50938L4.69689 11.3063L3.82502 16.6219C3.76877 16.9875 4.13439 17.2969 4.47189 17.0719L9.05627 14.5687L13.6125 17.0719C13.9219 17.2406 14.3156 16.9594 14.2313 16.6219L13.3594 11.3063L17.0438 7.50938C17.2688 7.25625 17.1563 6.77812 16.7906 6.72187Z"
-                              fill=""
-                            />
-                          </g>
-                          <defs>
-                            <clipPath id="clip0_375_9172">
-                              <rect width="18" height="18" fill="white" />
-                            </clipPath>
-                          </defs>
-                        </svg>
-
-                        <svg
-                          className="fill-[#FFA645]"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 18 18"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <g clipPath="url(#clip0_375_9172)">
-                            <path
-                              d="M16.7906 6.72187L11.7 5.93438L9.39377 1.09688C9.22502 0.759375 8.77502 0.759375 8.60627 1.09688L6.30002 5.9625L1.23752 6.72187C0.871891 6.77812 0.731266 7.25625 1.01252 7.50938L4.69689 11.3063L3.82502 16.6219C3.76877 16.9875 4.13439 17.2969 4.47189 17.0719L9.05627 14.5687L13.6125 17.0719C13.9219 17.2406 14.3156 16.9594 14.2313 16.6219L13.3594 11.3063L17.0438 7.50938C17.2688 7.25625 17.1563 6.77812 16.7906 6.72187Z"
-                              fill=""
-                            />
-                          </g>
-                          <defs>
-                            <clipPath id="clip0_375_9172">
-                              <rect width="18" height="18" fill="white" />
-                            </clipPath>
-                          </defs>
-                        </svg>
-                      </div>
-
-                      <span> (5 customer reviews) </span>
+                      {ratingStats.hasReviews ? (
+                        <>
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <svg
+                                key={star}
+                                className={`${
+                                  star <= Math.round(ratingStats.averageRating)
+                                    ? "fill-[#FFA645]"
+                                    : "fill-gray-5"
+                                }`}
+                                width="18"
+                                height="18"
+                                viewBox="0 0 18 18"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <g clipPath="url(#clip0_375_9172)">
+                                  <path
+                                    d="M16.7906 6.72187L11.7 5.93438L9.39377 1.09688C9.22502 0.759375 8.77502 0.759375 8.60627 1.09688L6.30002 5.9625L1.23752 6.72187C0.871891 6.77812 0.731266 7.25625 1.01252 7.50938L4.69689 11.3063L3.82502 16.6219C3.76877 16.9875 4.13439 17.2969 4.47189 17.0719L9.05627 14.5687L13.6125 17.0719C13.9219 17.2406 14.3156 16.9594 14.2313 16.6219L13.3594 11.3063L17.0438 7.50938C17.2688 7.25625 17.1563 6.77812 16.7906 6.72187Z"
+                                    fill=""
+                                  />
+                                </g>
+                                <defs>
+                                  <clipPath id="clip0_375_9172">
+                                    <rect width="18" height="18" fill="white" />
+                                  </clipPath>
+                                </defs>
+                              </svg>
+                            ))}
+                          </div>
+                          <span>
+                            {ratingStats.totalReviews} đánh giá của khách hàng
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-gray-5">Chưa có đánh giá</span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -647,23 +968,25 @@ const ShopDetails = () => {
                         </defs>
                       </svg>
 
-                      <span className="text-green"> In Stock </span>
+                      <span className="text-green"> Còn hàng. </span>
                     </div>
                   </div>
 
                   <h3 className="font-medium text-custom-1 mb-4.5">
                     <span className="text-sm sm:text-base text-dark">
-                      Price: ${priceCalculation.finalPrice.toFixed(2)}
+                      Giá: {formatPrice(priceCalculation.finalDiscountedPrice)}
                     </span>
-                    {product.discountedPrice && (
+                    {priceCalculation.finalDiscountedPrice <
+                      priceCalculation.finalPrice && (
                       <span className="line-through ml-2 text-gray-500">
-                        ${priceCalculation.finalDiscountedPrice.toFixed(2)}
+                        {formatPrice(priceCalculation.finalPrice)}
                       </span>
                     )}
                     {priceCalculation.additionalPrice > 0 && (
                       <span className="text-xs text-gray-500 ml-2">
-                        (Base: ${priceCalculation.basePrice.toFixed(2)} +
-                        Options: ${priceCalculation.additionalPrice.toFixed(2)})
+                        (Giá gốc: {formatPrice(priceCalculation.basePrice)} +
+                        Tùy chọn:{" "}
+                        {formatPrice(priceCalculation.additionalPrice)})
                       </span>
                     )}
                   </h3>
@@ -688,29 +1011,7 @@ const ShopDetails = () => {
                           fill="#3C50E0"
                         />
                       </svg>
-                      Free delivery available
-                    </li>
-
-                    <li className="flex items-center gap-2.5">
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M13.3589 8.35863C13.603 8.11455 13.603 7.71882 13.3589 7.47475C13.1149 7.23067 12.7191 7.23067 12.4751 7.47475L8.75033 11.1995L7.5256 9.97474C7.28152 9.73067 6.8858 9.73067 6.64172 9.97474C6.39764 10.2188 6.39764 10.6146 6.64172 10.8586L8.30838 12.5253C8.55246 12.7694 8.94819 12.7694 9.19227 12.5253L13.3589 8.35863Z"
-                          fill="#3C50E0"
-                        />
-                        <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M10.0003 1.04169C5.05277 1.04169 1.04199 5.05247 1.04199 10C1.04199 14.9476 5.05277 18.9584 10.0003 18.9584C14.9479 18.9584 18.9587 14.9476 18.9587 10C18.9587 5.05247 14.9479 1.04169 10.0003 1.04169ZM2.29199 10C2.29199 5.74283 5.74313 2.29169 10.0003 2.29169C14.2575 2.29169 17.7087 5.74283 17.7087 10C17.7087 14.2572 14.2575 17.7084 10.0003 17.7084C5.74313 17.7084 2.29199 14.2572 2.29199 10Z"
-                          fill="#3C50E0"
-                        />
-                      </svg>
-                      Sales 30% Off Use Code: PROMO30
+                      Miễn phí giao hàng - Sử dụng mã: ACC2201
                     </li>
                   </ul>
 
@@ -720,26 +1021,15 @@ const ShopDetails = () => {
                       {colors.length > 0 && (
                         <div className="flex items-center gap-4">
                           <div className="min-w-[65px]">
-                            <h4 className="font-medium text-dark">Color:</h4>
+                            <h4 className="font-medium text-dark">Màu sắc:</h4>
                           </div>
 
                           <div className="flex items-center gap-2.5 flex-wrap">
                             {colors.map((color, key) => {
-                              const colorsData = attributes?.colors || [];
-                              const colorObj = colorsData.find(
-                                (c: any) =>
-                                  (typeof c === "object" &&
-                                    (c.id === color || c.title === color)) ||
-                                  (typeof c === "string" && c === color)
-                              );
-                              const colorPrice =
-                                typeof colorObj === "object" && colorObj?.price
-                                  ? colorObj.price
-                                  : 0;
-                              const colorDisplay =
-                                typeof colorObj === "object" && colorObj?.title
-                                  ? colorObj.title
-                                  : color;
+                              const colorObj = getColorObject(color);
+                              const colorPrice = getColorPrice(color);
+                              const colorLabel = getColorLabel(color);
+                              const colorHex = getColorHex(color);
 
                               return (
                                 <label
@@ -759,7 +1049,8 @@ const ShopDetails = () => {
                                         console.log("🎨 Color changed:", {
                                           from: activeColor,
                                           to: color,
-                                          colorDisplay,
+                                          colorLabel,
+                                          colorHex,
                                         });
                                       }}
                                     />
@@ -767,17 +1058,17 @@ const ShopDetails = () => {
                                       className={`flex items-center justify-center w-5.5 h-5.5 rounded-full ${
                                         activeColor === color && "border-2"
                                       }`}
-                                      style={{ borderColor: `${color}` }}
+                                      style={{ borderColor: colorHex }}
                                     >
                                       <span
                                         className="block w-3 h-3 rounded-full"
-                                        style={{ backgroundColor: `${color}` }}
+                                        style={{ backgroundColor: colorHex }}
                                       ></span>
                                     </div>
                                   </div>
                                   {colorPrice > 0 && (
                                     <span className="text-xs text-blue">
-                                      (+${colorPrice.toFixed(2)})
+                                      (+${(colorPrice / 25000).toFixed(2)})
                                     </span>
                                   )}
                                 </label>
@@ -791,7 +1082,7 @@ const ShopDetails = () => {
                       {storages.length > 0 && (
                         <div className="flex items-center gap-4">
                           <div className="min-w-[65px]">
-                            <h4 className="font-medium text-dark">Storage:</h4>
+                            <h4 className="font-medium text-dark">Bộ nhớ:</h4>
                           </div>
 
                           <div className="flex items-center gap-4">
@@ -868,7 +1159,7 @@ const ShopDetails = () => {
                       {types.length > 0 && (
                         <div className="flex items-center gap-4">
                           <div className="min-w-[65px]">
-                            <h4 className="font-medium text-dark">Type:</h4>
+                            <h4 className="font-medium text-dark">Loại:</h4>
                           </div>
 
                           <div className="flex items-center gap-4">
@@ -945,7 +1236,7 @@ const ShopDetails = () => {
                       {sims.length > 0 && (
                         <div className="flex items-center gap-4">
                           <div className="min-w-[65px]">
-                            <h4 className="font-medium text-dark">Sim:</h4>
+                            <h4 className="font-medium text-dark">Số sim:</h4>
                           </div>
 
                           <div className="flex items-center gap-4">
@@ -1076,36 +1367,52 @@ const ShopDetails = () => {
                         onClick={handleAddToCart}
                         className="inline-flex font-medium text-white bg-blue py-3 px-7 rounded-md ease-out duration-200 hover:bg-blue-dark"
                       >
-                        Add to Cart
+                        Thêm vào giỏ hàng
                       </button>
 
-                      <a
-                        href="#"
-                        className="inline-flex font-medium text-white bg-dark py-3 px-7 rounded-md ease-out duration-200 hover:bg-opacity-95"
-                      >
-                        Purchase Now
-                      </a>
-
-                      <a
-                        href="#"
-                        className="flex items-center justify-center w-12 h-12 rounded-md border border-gray-3 ease-out duration-200 hover:text-white hover:bg-dark hover:border-transparent"
-                      >
-                        <svg
-                          className="fill-current"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            clipRule="evenodd"
-                            d="M5.62436 4.42423C3.96537 5.18256 2.75 6.98626 2.75 9.13713C2.75 11.3345 3.64922 13.0283 4.93829 14.4798C6.00072 15.6761 7.28684 16.6677 8.54113 17.6346C8.83904 17.8643 9.13515 18.0926 9.42605 18.3219C9.95208 18.7366 10.4213 19.1006 10.8736 19.3649C11.3261 19.6293 11.6904 19.75 12 19.75C12.3096 19.75 12.6739 19.6293 13.1264 19.3649C13.5787 19.1006 14.0479 18.7366 14.574 18.3219C14.8649 18.0926 15.161 17.8643 15.4589 17.6346C16.7132 16.6677 17.9993 15.6761 19.0617 14.4798C20.3508 13.0283 21.25 11.3345 21.25 9.13713C21.25 6.98626 20.0346 5.18256 18.3756 4.42423C16.7639 3.68751 14.5983 3.88261 12.5404 6.02077C12.399 6.16766 12.2039 6.25067 12 6.25067C11.7961 6.25067 11.601 6.16766 11.4596 6.02077C9.40166 3.88261 7.23607 3.68751 5.62436 4.42423ZM12 4.45885C9.68795 2.39027 7.09896 2.1009 5.00076 3.05999C2.78471 4.07296 1.25 6.42506 1.25 9.13713C1.25 11.8027 2.3605 13.8361 3.81672 15.4758C4.98287 16.789 6.41022 17.888 7.67083 18.8586C7.95659 19.0786 8.23378 19.2921 8.49742 19.4999C9.00965 19.9037 9.55954 20.3343 10.1168 20.66C10.6739 20.9855 11.3096 21.25 12 21.25C12.6904 21.25 13.3261 20.9855 13.8832 20.66C14.4405 20.3343 14.9903 19.9037 15.5026 19.4999C15.7662 19.2921 16.0434 19.0786 16.3292 18.8586C17.5898 17.888 19.0171 16.789 20.1833 15.4758C21.6395 13.8361 22.75 11.8027 22.75 9.13713C22.75 6.42506 21.2153 4.07296 18.9992 3.05999C16.901 2.1009 14.3121 2.39027 12 4.45885Z"
-                            fill=""
-                          />
-                        </svg>
-                      </a>
+                      {product?.id && (
+                        <WishlistButton
+                          productId={product.id}
+                          productVariantId={
+                            product.hasVariants && findVariantByOptions()
+                              ? findVariantByOptions()?.id || null
+                              : null
+                          }
+                          selectedOptions={(() => {
+                            const options: Record<string, string> = {};
+                            if (activeColor) {
+                              options.color = getColorLabel(activeColor);
+                            }
+                            if (storage) {
+                              const storageOption = storages.find(
+                                (s) => s.id === storage
+                              );
+                              if (storageOption) {
+                                options.storage =
+                                  storageOption.title || storage;
+                              }
+                            }
+                            if (type) {
+                              const typeOption = types.find(
+                                (t) => t.id === type
+                              );
+                              if (typeOption) {
+                                options.type = typeOption.title || type;
+                              }
+                            }
+                            if (sim) {
+                              const simOption = sims.find((s) => s.id === sim);
+                              if (simOption) {
+                                options.sim = simOption.title || sim;
+                              }
+                            }
+                            return Object.keys(options).length > 0
+                              ? options
+                              : null;
+                          })()}
+                          size="lg"
+                        />
+                      )}
                     </div>
                   </form>
                 </div>
@@ -1143,7 +1450,7 @@ const ShopDetails = () => {
                 >
                   <div className="max-w-[670px] w-full">
                     <h2 className="font-medium text-2xl text-dark mb-7">
-                      Description:
+                      Mô tả sản phẩm:
                     </h2>
 
                     {product.description ? (
@@ -1154,26 +1461,26 @@ const ShopDetails = () => {
                       </div>
                     ) : (
                       <p className="text-gray-500">
-                        No description available for this product.
+                        Không có mô tả sản phẩm cho sản phẩm này.
                       </p>
                     )}
                   </div>
 
                   <div className="max-w-[447px] w-full">
                     <h2 className="font-medium text-2xl text-dark mb-7">
-                      Care & Maintenance:
+                      Chăm sóc & Bảo trì:
                     </h2>
 
                     <p className="mb-6">
-                      To ensure optimal performance and longevity of your
-                      product, please follow these care guidelines: Keep the
-                      device clean and dry, avoid extreme temperatures, and use
-                      only recommended accessories and chargers.
+                      Để đảm bảo hiệu suất và tuổi thọ tốt nhất của sản phẩm,
+                      vui lòng tuân theo các hướng dẫn chăm sóc sau: Giữ cho
+                      thiết bị sạch và khô, tránh nhiệt độ quá cao, và sử dụng
+                      các phụ kiện và sạc được khuyến khích.
                     </p>
                     <p>
-                      For detailed maintenance instructions, please refer to the
-                      user manual included with your purchase or visit our
-                      support website.
+                      Để xem hướng dẫn bảo trì chi tiết, vui lòng xem sách hướng
+                      dẫn sử dụng đi kèm với đơn hàng của bạn hoặc truy cập
+                      trang web hỗ trợ của chúng tôi.
                     </p>
                   </div>
                 </div>
@@ -1213,7 +1520,7 @@ const ShopDetails = () => {
                   ) : (
                     <div className="text-center py-10">
                       <p className="text-gray-500">
-                        No additional information available for this product.
+                        Không có thông tin bổ sung cho sản phẩm này.
                       </p>
                     </div>
                   )}
@@ -1224,520 +1531,16 @@ const ShopDetails = () => {
               {/* <!-- tab content three start --> */}
               <div>
                 <div
-                  className={`flex-col sm:flex-row gap-7.5 xl:gap-12.5 mt-12.5 ${
-                    activeTab === "tabThree" ? "flex" : "hidden"
+                  className={`mt-12.5 ${
+                    activeTab === "tabThree" ? "block" : "hidden"
                   }`}
                 >
-                  <div className="max-w-[570px] w-full">
-                    <h2 className="font-medium text-2xl text-dark mb-9">
-                      03 Review for this product
-                    </h2>
-
-                    <div className="flex flex-col gap-6">
-                      {/* <!-- review item --> */}
-                      <div className="rounded-xl bg-white shadow-1 p-4 sm:p-6">
-                        <div className="flex items-center justify-between">
-                          <a href="#" className="flex items-center gap-4">
-                            <div className="w-12.5 h-12.5 rounded-full overflow-hidden">
-                              <Image
-                                src="/images/users/user-01.jpg"
-                                alt="author"
-                                className="w-12.5 h-12.5 rounded-full overflow-hidden"
-                                width={50}
-                                height={50}
-                              />
-                            </div>
-
-                            <div>
-                              <h3 className="font-medium text-dark">
-                                Davis Dorwart
-                              </h3>
-                              <p className="text-custom-sm">
-                                Serial Entrepreneur
-                              </p>
-                            </div>
-                          </a>
-
-                          <div className="flex items-center gap-1">
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-                          </div>
-                        </div>
-
-                        <p className="text-dark mt-6">
-                          “Lorem ipsum dolor sit amet, adipiscing elit. Donec
-                          malesuada justo vitaeaugue suscipit beautiful
-                          vehicula’’
-                        </p>
-                      </div>
-
-                      {/* <!-- review item --> */}
-                      <div className="rounded-xl bg-white shadow-1 p-4 sm:p-6">
-                        <div className="flex items-center justify-between">
-                          <a href="#" className="flex items-center gap-4">
-                            <div className="w-12.5 h-12.5 rounded-full overflow-hidden">
-                              <Image
-                                src="/images/users/user-01.jpg"
-                                alt="author"
-                                className="w-12.5 h-12.5 rounded-full overflow-hidden"
-                                width={50}
-                                height={50}
-                              />
-                            </div>
-
-                            <div>
-                              <h3 className="font-medium text-dark">
-                                Davis Dorwart
-                              </h3>
-                              <p className="text-custom-sm">
-                                Serial Entrepreneur
-                              </p>
-                            </div>
-                          </a>
-
-                          <div className="flex items-center gap-1">
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-                          </div>
-                        </div>
-
-                        <p className="text-dark mt-6">
-                          “Lorem ipsum dolor sit amet, adipiscing elit. Donec
-                          malesuada justo vitaeaugue suscipit beautiful
-                          vehicula’’
-                        </p>
-                      </div>
-
-                      {/* <!-- review item --> */}
-                      <div className="rounded-xl bg-white shadow-1 p-4 sm:p-6">
-                        <div className="flex items-center justify-between">
-                          <a href="#" className="flex items-center gap-4">
-                            <div className="w-12.5 h-12.5 rounded-full overflow-hidden">
-                              <Image
-                                src="/images/users/user-01.jpg"
-                                alt="author"
-                                className="w-12.5 h-12.5 rounded-full overflow-hidden"
-                                width={50}
-                                height={50}
-                              />
-                            </div>
-
-                            <div>
-                              <h3 className="font-medium text-dark">
-                                Davis Dorwart
-                              </h3>
-                              <p className="text-custom-sm">
-                                Serial Entrepreneur
-                              </p>
-                            </div>
-                          </a>
-
-                          <div className="flex items-center gap-1">
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-
-                            <span className="cursor-pointer text-[#FBB040]">
-                              <svg
-                                className="fill-current"
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                  fill=""
-                                />
-                              </svg>
-                            </span>
-                          </div>
-                        </div>
-
-                        <p className="text-dark mt-6">
-                          “Lorem ipsum dolor sit amet, adipiscing elit. Donec
-                          malesuada justo vitaeaugue suscipit beautiful
-                          vehicula’’
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="max-w-[550px] w-full">
-                    <form>
-                      <h2 className="font-medium text-2xl text-dark mb-3.5">
-                        Add a Review
-                      </h2>
-
-                      <p className="mb-6">
-                        Your email address will not be published. Required
-                        fields are marked *
-                      </p>
-
-                      <div className="flex items-center gap-3 mb-7.5">
-                        <span>Your Rating*</span>
-
-                        <div className="flex items-center gap-1">
-                          <span className="cursor-pointer text-[#FBB040]">
-                            <svg
-                              className="fill-current"
-                              width="15"
-                              height="16"
-                              viewBox="0 0 15 16"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                fill=""
-                              />
-                            </svg>
-                          </span>
-
-                          <span className="cursor-pointer text-[#FBB040]">
-                            <svg
-                              className="fill-current"
-                              width="15"
-                              height="16"
-                              viewBox="0 0 15 16"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                fill=""
-                              />
-                            </svg>
-                          </span>
-
-                          <span className="cursor-pointer text-[#FBB040]">
-                            <svg
-                              className="fill-current"
-                              width="15"
-                              height="16"
-                              viewBox="0 0 15 16"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                fill=""
-                              />
-                            </svg>
-                          </span>
-
-                          <span className="cursor-pointer text-gray-5">
-                            <svg
-                              className="fill-current"
-                              width="15"
-                              height="16"
-                              viewBox="0 0 15 16"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                fill=""
-                              />
-                            </svg>
-                          </span>
-
-                          <span className="cursor-pointer text-gray-5">
-                            <svg
-                              className="fill-current"
-                              width="15"
-                              height="16"
-                              viewBox="0 0 15 16"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                d="M14.6604 5.90785L9.97461 5.18335L7.85178 0.732874C7.69645 0.422375 7.28224 0.422375 7.12691 0.732874L5.00407 5.20923L0.344191 5.90785C0.0076444 5.9596 -0.121797 6.39947 0.137085 6.63235L3.52844 10.1255L2.72591 15.0158C2.67413 15.3522 3.01068 15.6368 3.32134 15.4298L7.54112 13.1269L11.735 15.4298C12.0198 15.5851 12.3822 15.3263 12.3046 15.0158L11.502 10.1255L14.8934 6.63235C15.1005 6.39947 14.9969 5.9596 14.6604 5.90785Z"
-                                fill=""
-                              />
-                            </svg>
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl bg-white shadow-1 p-4 sm:p-6">
-                        <div className="mb-5">
-                          <label htmlFor="comments" className="block mb-2.5">
-                            Comments
-                          </label>
-
-                          <textarea
-                            name="comments"
-                            id="comments"
-                            rows={5}
-                            placeholder="Your comments"
-                            className="rounded-md border border-gray-3 bg-gray-1 placeholder:text-dark-5 w-full p-5 outline-none duration-200 focus:border-transparent focus:shadow-input focus:ring-2 focus:ring-blue/20"
-                          ></textarea>
-
-                          <span className="flex items-center justify-between mt-2.5">
-                            <span className="text-custom-sm text-dark-4">
-                              Maximum
-                            </span>
-                            <span className="text-custom-sm text-dark-4">
-                              0/250
-                            </span>
-                          </span>
-                        </div>
-
-                        <div className="flex flex-col lg:flex-row gap-5 sm:gap-7.5 mb-5.5">
-                          <div>
-                            <label htmlFor="name" className="block mb-2.5">
-                              Name
-                            </label>
-
-                            <input
-                              type="text"
-                              name="name"
-                              id="name"
-                              placeholder="Your name"
-                              className="rounded-md border border-gray-3 bg-gray-1 placeholder:text-dark-5 w-full py-2.5 px-5 outline-none duration-200 focus:border-transparent focus:shadow-input focus:ring-2 focus:ring-blue/20"
-                            />
-                          </div>
-
-                          <div>
-                            <label htmlFor="email" className="block mb-2.5">
-                              Email
-                            </label>
-
-                            <input
-                              type="email"
-                              name="email"
-                              id="email"
-                              placeholder="Your email"
-                              className="rounded-md border border-gray-3 bg-gray-1 placeholder:text-dark-5 w-full py-2.5 px-5 outline-none duration-200 focus:border-transparent focus:shadow-input focus:ring-2 focus:ring-blue/20"
-                            />
-                          </div>
-                        </div>
-
-                        <button
-                          type="submit"
-                          className="inline-flex font-medium text-white bg-blue py-3 px-7 rounded-md ease-out duration-200 hover:bg-blue-dark"
-                        >
-                          Submit Reviews
-                        </button>
-                      </div>
-                    </form>
-                  </div>
+                  {product?.id && (
+                    <ReviewsSection
+                      productId={product.id}
+                      onReviewsUpdate={handleReviewsUpdate}
+                    />
+                  )}
                 </div>
               </div>
               {/* <!-- tab content three end --> */}
@@ -1746,8 +1549,6 @@ const ShopDetails = () => {
           </section>
 
           <RecentlyViewdItems />
-
-          <Newsletter />
         </>
       )}
     </>

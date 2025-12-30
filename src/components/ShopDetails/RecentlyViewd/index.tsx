@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import shopData from "@/components/Shop/shopData";
+import { useProducts } from "@/hooks/queries/useProducts";
 import ProductItem from "@/components/Common/ProductItem";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,6 +11,9 @@ import "swiper/css/navigation";
 import "swiper/css";
 
 const RecentlyViewdItems = () => {
+  // Fetch products from API
+  const { data: productsData, isLoading } = useProducts({ limit: 8 });
+  const products = productsData?.products || [];
   const sliderRef = useRef(null);
 
   const handlePrev = useCallback(() => {
@@ -37,11 +40,8 @@ const RecentlyViewdItems = () => {
                   height={17}
                   alt="icon"
                 />
-                Categories
+                Có thể bạn thích
               </span>
-              <h2 className="font-semibold text-xl xl:text-heading-5 text-dark">
-                Browse by Category
-              </h2>
             </div>
 
             <div className="flex items-center gap-3">
@@ -89,11 +89,19 @@ const RecentlyViewdItems = () => {
             spaceBetween={20}
             className="justify-between"
           >
-            {shopData.map((item, key) => (
-              <SwiperSlide key={key}>
-                <ProductItem item={item} />
-              </SwiperSlide>
-            ))}
+            {isLoading
+              ? Array.from({ length: 4 }).map((_, idx) => (
+                  <SwiperSlide key={`skeleton-${idx}`}>
+                    <div className="h-72 rounded-2xl bg-gray-2 animate-pulse" />
+                  </SwiperSlide>
+                ))
+              : products && products.length > 0
+                ? products.map((item) => (
+                    <SwiperSlide key={item.id}>
+                      <ProductItem item={item} />
+                    </SwiperSlide>
+                  ))
+                : null}
           </Swiper>
         </div>
       </div>

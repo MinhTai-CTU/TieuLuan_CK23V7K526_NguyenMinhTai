@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 
-const CustomSelect = ({ options }) => {
+type Option = { label: string; value: string };
+interface CustomSelectProps {
+  options: Option[];
+  initialValue?: string;
+  onChange?: (value: string) => void;
+}
+
+const CustomSelect = ({ options, initialValue, onChange }: CustomSelectProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedOption, setSelectedOption] = useState(options[0]);
+  const defaultOption =
+    options.find((o) => o.value === initialValue) || options[0];
+  const [selectedOption, setSelectedOption] = useState<Option>(defaultOption);
   const selectRef = useRef(null);
 
   // Function to close the dropdown when a click occurs outside the component
@@ -26,9 +35,10 @@ const CustomSelect = ({ options }) => {
     setIsOpen(!isOpen);
   };
 
-  const handleOptionClick = (option) => {
+  const handleOptionClick = (option: Option) => {
     setSelectedOption(option);
     toggleDropdown();
+    onChange?.(option.value);
   };
 
   return (
@@ -45,9 +55,9 @@ const CustomSelect = ({ options }) => {
         {selectedOption.label}
       </div>
       <div className={`select-items ${isOpen ? "" : "select-hide"}`}>
-        {options.slice(1).map((option, index) => (
+        {options.slice(1).map((option) => (
           <div
-            key={index}
+            key={option.value}
             onClick={() => handleOptionClick(option)}
             className={`select-item ${
               selectedOption === option ? "same-as-selected" : ""

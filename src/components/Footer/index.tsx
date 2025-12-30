@@ -11,7 +11,7 @@ const Footer = () => {
         <div className="flex flex-wrap xl:flex-nowrap gap-10 xl:gap-19 xl:justify-between pt-17.5 xl:pt-22.5 pb-10 xl:pb-15">
           <div className="max-w-[330px] w-full">
             <h2 className="mb-7.5 text-custom-1 font-medium text-dark">
-              Help & Support
+              Hỗ trợ & Hỗ trợ
             </h2>
 
             <ul className="flex flex-col gap-3">
@@ -32,7 +32,8 @@ const Footer = () => {
                     />
                   </svg>
                 </span>
-                685 Market Street,Las Vegas, LA 95820,United States.
+                Số 404 đường Nguyễn Văn Linh, Phường An Khánh, Quận Ninh Kiều,
+                TP. Cần Thơ.
               </li>
 
               <li>
@@ -61,7 +62,7 @@ const Footer = () => {
                       fill="#3C50E0"
                     />
                   </svg>
-                  (+099) 532-786-9843
+                  0999 999 999
                 </a>
               </li>
 
@@ -81,7 +82,7 @@ const Footer = () => {
                       fill="#3C50E0"
                     />
                   </svg>
-                  support@example.com
+                  minhtai2019cb2@gmail.com
                 </a>
               </li>
             </ul>
@@ -198,33 +199,48 @@ const Footer = () => {
 
           <div className="w-full sm:w-auto">
             <h2 className="mb-7.5 text-custom-1 font-medium text-dark">
-              Account
+              Tài khoản
             </h2>
 
             <ul className="flex flex-col gap-3.5">
               <li>
-                <a className="ease-out duration-200 hover:text-blue" href="#">
-                  My Account
+                <a
+                  className="ease-out duration-200 hover:text-blue"
+                  href="/my-account"
+                >
+                  Tài khoản của tôi
                 </a>
               </li>
               <li>
-                <a className="ease-out duration-200 hover:text-blue" href="#">
-                  Login / Register
+                <a
+                  className="ease-out duration-200 hover:text-blue"
+                  href="/signin"
+                >
+                  Đăng nhập / Đăng ký
                 </a>
               </li>
               <li>
-                <a className="ease-out duration-200 hover:text-blue" href="#">
+                <a
+                  className="ease-out duration-200 hover:text-blue"
+                  href="/cart"
+                >
                   Cart
                 </a>
               </li>
               <li>
-                <a className="ease-out duration-200 hover:text-blue" href="#">
-                  Wishlist
+                <a
+                  className="ease-out duration-200 hover:text-blue"
+                  href="/wishlist"
+                >
+                  Yêu thích
                 </a>
               </li>
               <li>
-                <a className="ease-out duration-200 hover:text-blue" href="#">
-                  Shop
+                <a
+                  className="ease-out duration-200 hover:text-blue"
+                  href="/shop-with-sidebar"
+                >
+                  Cửa hàng
                 </a>
               </li>
             </ul>
@@ -232,33 +248,33 @@ const Footer = () => {
 
           <div className="w-full sm:w-auto">
             <h2 className="mb-7.5 text-custom-1 font-medium text-dark">
-              Quick Link
+              Liên kết nhanh
             </h2>
 
             <ul className="flex flex-col gap-3">
               <li>
                 <a className="ease-out duration-200 hover:text-blue" href="#">
-                  Privacy Policy
+                  Quyền riêng tư
                 </a>
               </li>
               <li>
                 <a className="ease-out duration-200 hover:text-blue" href="#">
-                  Refund Policy
+                  Chính sách hoàn trả
                 </a>
               </li>
               <li>
                 <a className="ease-out duration-200 hover:text-blue" href="#">
-                  Terms of Use
+                  Điều khoản sử dụng
                 </a>
               </li>
               <li>
                 <a className="ease-out duration-200 hover:text-blue" href="#">
-                  FAQ’s
+                  Câu hỏi thường gặp
                 </a>
               </li>
               <li>
                 <a className="ease-out duration-200 hover:text-blue" href="#">
-                  Contact
+                  Liên hệ
                 </a>
               </li>
             </ul>
@@ -266,12 +282,8 @@ const Footer = () => {
 
           <div className="w-full sm:w-auto">
             <h2 className="mb-7.5 text-custom-1 font-medium text-dark lg:text-right">
-              Download App
+              Tải app
             </h2>
-
-            <p className="lg:text-right text-custom-sm mb-4">
-              Save $3 With App & New User only
-            </p>
 
             <ul className="flex flex-col lg:items-end gap-3">
               <li>
@@ -332,65 +344,6 @@ const Footer = () => {
         </div>
         {/* <!-- footer menu end --> */}
       </div>
-
-      {/* <!-- footer bottom start --> */}
-      <div className="py-5 xl:py-7.5 bg-gray-1">
-        <div className="max-w-[1170px] mx-auto px-4 sm:px-8 xl:px-0">
-          <div className="flex gap-5 flex-wrap items-center justify-between">
-            <p className="text-dark font-medium">
-              &copy; {year}. All rights reserved by PimjoLabs.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-4">
-              <p className="font-medium">We Accept:</p>
-
-              <div className="flex flex-wrap items-center gap-6">
-                <a href="#" aria-label="payment system with visa card">
-                  <Image
-                    src="/images/payment/payment-01.svg"
-                    alt="visa card"
-                    width={66}
-                    height={22}
-                  />
-                </a>
-                <a href="#" aria-label="payment system with paypal">
-                  <Image
-                    src="/images/payment/payment-02.svg"
-                    alt="paypal"
-                    width={18}
-                    height={21}
-                  />
-                </a>
-                <a href="#" aria-label="payment system with master card">
-                  <Image
-                    src="/images/payment/payment-03.svg"
-                    alt="master card"
-                    width={33}
-                    height={24}
-                  />
-                </a>
-                <a href="#" aria-label="payment system with apple pay">
-                  <Image
-                    src="/images/payment/payment-04.svg"
-                    alt="apple pay"
-                    width={52.94}
-                    height={22}
-                  />
-                </a>
-                <a href="#" aria-label="payment system with google pay">
-                  <Image
-                    src="/images/payment/payment-05.svg"
-                    alt="google pay"
-                    width={56}
-                    height={22}
-                  />
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* <!-- footer bottom end --> */}
     </footer>
   );
 };

@@ -90,7 +90,7 @@ export const AlertDialogContent: React.FC<{
 
   return (
     <div
-      className="bg-white rounded-lg shadow-lg p-6 w-full"
+      className="bg-white rounded-xl shadow-2xl p-6 w-full border border-gray-200"
       onClick={(e) => e.stopPropagation()}
     >
       {children}
@@ -106,14 +106,22 @@ export const AlertDialogHeader: React.FC<{
 
 export const AlertDialogTitle: React.FC<{
   children: React.ReactNode;
-}> = ({ children }) => {
-  return <h2 className="text-lg font-semibold text-dark">{children}</h2>;
+  className?: string;
+}> = ({ children, className }) => {
+  return (
+    <h2 className={`text-lg font-semibold text-dark ${className || ""}`}>
+      {children}
+    </h2>
+  );
 };
 
 export const AlertDialogDescription: React.FC<{
   children: React.ReactNode;
-}> = ({ children }) => {
-  return <p className="text-sm text-dark-4 mt-2">{children}</p>;
+  className?: string;
+}> = ({ children, className }) => {
+  return (
+    <p className={`text-sm text-dark-4 mt-2 ${className || ""}`}>{children}</p>
+  );
 };
 
 export const AlertDialogFooter: React.FC<{
@@ -129,7 +137,8 @@ export const AlertDialogFooter: React.FC<{
 export const AlertDialogCancel: React.FC<{
   children: React.ReactNode;
   onClick?: () => void;
-}> = ({ children, onClick }) => {
+  disabled?: boolean;
+}> = ({ children, onClick, disabled }) => {
   const context = React.useContext(AlertDialogContext);
   if (!context)
     throw new Error("AlertDialogCancel must be used within AlertDialog");
@@ -138,10 +147,13 @@ export const AlertDialogCancel: React.FC<{
     <button
       type="button"
       onClick={() => {
-        context.onOpenChange(false);
-        onClick?.();
+        if (!disabled) {
+          context.onOpenChange(false);
+          onClick?.();
+        }
       }}
-      className="px-4 py-2 text-sm font-medium text-dark bg-gray-2 border border-gray-3 rounded-md hover:bg-gray-3 ease-out duration-200"
+      disabled={disabled}
+      className="px-4 py-2 text-sm font-medium text-dark bg-gray-2 border border-gray-3 rounded-md hover:bg-gray-3 ease-out duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {children}
     </button>
@@ -152,7 +164,8 @@ export const AlertDialogAction: React.FC<{
   children: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
-}> = ({ children, onClick, disabled }) => {
+  className?: string;
+}> = ({ children, onClick, disabled, className }) => {
   const context = React.useContext(AlertDialogContext);
   if (!context)
     throw new Error("AlertDialogAction must be used within AlertDialog");
@@ -167,7 +180,7 @@ export const AlertDialogAction: React.FC<{
         }
       }}
       disabled={disabled}
-      className="px-4 py-2 text-sm font-medium text-white bg-blue rounded-md hover:bg-blue-dark ease-out duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      className={`px-4 py-2 text-sm font-medium text-white bg-blue rounded-md hover:bg-blue-dark ease-out duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${className || ""}`}
     >
       {children}
     </button>

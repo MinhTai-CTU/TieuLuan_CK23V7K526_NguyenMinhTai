@@ -64,7 +64,7 @@ export default function OAuthCallbackPage() {
         toastShown.current = true;
         toast.error(
           isFacebookError && errorParam === "AccessDenied"
-            ? "Facebook login failed: Account missing email or permissions not granted"
+            ? "Đăng nhập Facebook thất bại: Tài khoản thiếu email hoặc không được cấp quyền"
             : errorMessage,
           { duration: 6000, id: "oauth-error" } // Use id to prevent duplicates
         );
@@ -119,14 +119,25 @@ export default function OAuthCallbackPage() {
             // Only show toast once
             if (!toastShown.current) {
               toastShown.current = true;
-              toast.success("Login successful! Welcome back!", {
+              toast.success("Đăng nhập thành công! Chào mừng bạn trở lại!", {
                 id: "oauth-success",
               });
             }
 
-            // Redirect to home
+            // Get returnUrl from localStorage (saved before OAuth) or default to home
+            const returnUrl =
+              typeof window !== "undefined"
+                ? localStorage.getItem("oauth_returnUrl") || "/"
+                : "/";
+
+            // Clear returnUrl from localStorage
+            if (typeof window !== "undefined") {
+              localStorage.removeItem("oauth_returnUrl");
+            }
+
+            // Redirect to returnUrl or home
             const redirectTimer = setTimeout(() => {
-              router.push("/");
+              router.push(returnUrl);
             }, 1000);
 
             return () => clearTimeout(redirectTimer);
@@ -145,7 +156,7 @@ export default function OAuthCallbackPage() {
         if (!toastShown.current) {
           toastShown.current = true;
           toast.error(
-            error.message || "Failed to complete login. Please try again.",
+            error.message || "Không thể hoàn tất đăng nhập. Vui lòng thử lại.",
             { id: "oauth-callback-error" }
           );
         }

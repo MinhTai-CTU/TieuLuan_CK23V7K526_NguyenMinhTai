@@ -1,47 +1,183 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Breadcrumb from "../Common/Breadcrumb";
 import Image from "next/image";
 import AddressModal from "./AddressModal";
 import Orders from "../Orders";
+import ProfileTab from "./ProfileTab";
+import ChangePasswordTab from "./ChangePasswordTab";
+import DashboardStats from "./DashboardStats";
+import { useAuth } from "@/hooks/useAuth";
+import { getAuthHeader } from "@/lib/auth-storage";
 
 const MyAccount = () => {
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [addressModal, setAddressModal] = useState(false);
 
-  const openAddressModal = () => {
+  // Read query params on mount
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+  const [addressModal, setAddressModal] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<{
+    name: string | null;
+    avatar: string | null;
+    createdAt: string | null;
+  } | null>(null);
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [addressesLoading, setAddressesLoading] = useState(false);
+
+  // Fetch user profile for sidebar
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const authHeader = getAuthHeader();
+        if (!authHeader) return;
+
+        const response = await fetch("/api/auth/profile", {
+          headers: {
+            Authorization: authHeader,
+          },
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data.user) {
+            setUserProfile({
+              name: result.data.user.name,
+              avatar: result.data.user.avatar,
+              createdAt: result.data.user.createdAt,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      }
+    };
+    if (user) {
+      fetchProfile();
+    }
+  }, [user]);
+
+  // Fetch addresses
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      if (activeTab !== "addresses") return;
+
+      try {
+        setAddressesLoading(true);
+        const authHeader = getAuthHeader();
+        if (!authHeader) {
+          setAddressesLoading(false);
+          return;
+        }
+
+        const response = await fetch("/api/addresses", {
+          headers: {
+            Authorization: authHeader,
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setAddresses(result.data || []);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching addresses:", error);
+      } finally {
+        setAddressesLoading(false);
+      }
+    };
+
+    if (user && activeTab === "addresses") {
+      fetchAddresses();
+    }
+  }, [user, activeTab]);
+
+  const openAddressModal = (address?: any) => {
+    setEditingAddress(address || null);
     setAddressModal(true);
   };
 
   const closeAddressModal = () => {
     setAddressModal(false);
+    setEditingAddress(null);
+    // Refresh addresses when modal closes
+    if (activeTab === "addresses" && user) {
+      const fetchAddresses = async () => {
+        try {
+          const authHeader = getAuthHeader();
+          if (!authHeader) return;
+
+          const response = await fetch("/api/addresses", {
+            headers: {
+              Authorization: authHeader,
+            },
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+              setAddresses(result.data || []);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching addresses:", error);
+        }
+      };
+      fetchAddresses();
+    }
   };
 
   return (
     <>
-      <Breadcrumb title={"My Account"} pages={["my account"]} />
+      <Breadcrumb title={"Tài khoản của tôi"} pages={["my account"]} />
 
       <section className="overflow-hidden py-20 bg-gray-2">
-        <div className="max-w-[1170px] w-full mx-auto px-4 sm:px-8 xl:px-0">
+        <div className="max-w-[1400px] w-full mx-auto px-4 sm:px-8 xl:px-0">
           <div className="flex flex-col xl:flex-row gap-7.5">
             {/* <!--== user dashboard menu start ==--> */}
-            <div className="xl:max-w-[370px] w-full bg-white rounded-xl shadow-1">
+            <div className="xl:max-w-[400px] w-full bg-white rounded-xl shadow-1">
               <div className="flex xl:flex-col">
                 <div className="hidden lg:flex flex-wrap items-center gap-5 py-6 px-4 sm:px-7.5 xl:px-9 border-r xl:border-r-0 xl:border-b border-gray-3">
-                  <div className="max-w-[64px] w-full h-16 rounded-full overflow-hidden">
-                    <Image
-                      src="/images/users/user-04.jpg"
-                      alt="user"
-                      width={64}
-                      height={64}
-                    />
+                  <div className="max-w-[64px] w-full h-16 rounded-full overflow-hidden bg-gray-3 flex items-center justify-center">
+                    {userProfile?.avatar || user?.avatar ? (
+                      <Image
+                        src={userProfile?.avatar || user?.avatar || ""}
+                        alt={userProfile?.name || user?.name || "User"}
+                        width={64}
+                        height={64}
+                        className="object-cover w-full h-full"
+                      />
+                    ) : (
+                      <span className="text-2xl text-dark-4 font-semibold">
+                        {(userProfile?.name ||
+                          user?.name)?.[0]?.toUpperCase() || "U"}
+                      </span>
+                    )}
                   </div>
 
                   <div>
                     <p className="font-medium text-dark mb-0.5">
-                      James Septimus
+                      {userProfile?.name || user?.name || "User"}
                     </p>
-                    <p className="text-custom-xs">Member Since Sep 2020</p>
+                    <p className="text-custom-xs">
+                      {userProfile?.createdAt
+                        ? `Thành viên từ ${new Date(
+                            userProfile.createdAt
+                          ).toLocaleDateString("vi-VN", {
+                            month: "short",
+                            year: "numeric",
+                          })}`
+                        : "Thành viên"}
+                    </p>
                   </div>
                 </div>
 
@@ -88,7 +224,7 @@ const MyAccount = () => {
                           fill=""
                         />
                       </svg>
-                      Dashboard
+                      Trang tổng quan
                     </button>
                     <button
                       onClick={() => setActiveTab("orders")}
@@ -125,35 +261,7 @@ const MyAccount = () => {
                           fill=""
                         />
                       </svg>
-                      Orders
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab("downloads")}
-                      className={`flex items-center rounded-md gap-2.5 py-3 px-4.5 ease-out duration-200 hover:bg-blue hover:text-white ${
-                        activeTab === "downloads"
-                          ? "text-white bg-blue"
-                          : "text-dark-2 bg-gray-1"
-                      }`}
-                    >
-                      <svg
-                        className="fill-current"
-                        width="22"
-                        height="22"
-                        viewBox="0 0 22 22"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M11.5074 15.1306C11.3772 15.273 11.193 15.3542 11 15.3542C10.807 15.3542 10.6229 15.273 10.4926 15.1306L6.82594 11.1202C6.56973 10.8399 6.5892 10.4051 6.86943 10.1489C7.14966 9.89265 7.58452 9.91212 7.84073 10.1923L10.3125 12.8958V2.75C10.3125 2.3703 10.6203 2.0625 11 2.0625C11.3797 2.0625 11.6875 2.3703 11.6875 2.75V12.8958L14.1593 10.1923C14.4155 9.91212 14.8503 9.89265 15.1306 10.1489C15.4108 10.4051 15.4303 10.8399 15.1741 11.1202L11.5074 15.1306Z"
-                          fill=""
-                        />
-                        <path
-                          d="M3.4375 13.75C3.4375 13.3703 3.1297 13.0625 2.75 13.0625C2.37031 13.0625 2.0625 13.3703 2.0625 13.75V13.8003C2.06248 15.0539 2.06247 16.0644 2.16931 16.8591C2.28025 17.6842 2.51756 18.3789 3.06932 18.9307C3.62108 19.4824 4.3158 19.7198 5.1409 19.8307C5.93562 19.9375 6.94608 19.9375 8.1997 19.9375H13.8003C15.0539 19.9375 16.0644 19.9375 16.8591 19.8307C17.6842 19.7198 18.3789 19.4824 18.9307 18.9307C19.4824 18.3789 19.7198 17.6842 19.8307 16.8591C19.9375 16.0644 19.9375 15.0539 19.9375 13.8003V13.75C19.9375 13.3703 19.6297 13.0625 19.25 13.0625C18.8703 13.0625 18.5625 13.3703 18.5625 13.75C18.5625 15.0658 18.561 15.9835 18.468 16.6759C18.3775 17.3485 18.2121 17.7047 17.9584 17.9584C17.7047 18.2121 17.3485 18.3775 16.6759 18.4679C15.9835 18.561 15.0658 18.5625 13.75 18.5625H8.25C6.9342 18.5625 6.01652 18.561 5.32411 18.4679C4.65148 18.3775 4.29529 18.2121 4.04159 17.9584C3.78789 17.7047 3.62249 17.3485 3.53205 16.6759C3.43896 15.9835 3.4375 15.0658 3.4375 13.75Z"
-                          fill=""
-                        />
-                      </svg>
-                      Downloads
+                      Đơn hàng
                     </button>
 
                     <button
@@ -183,13 +291,13 @@ const MyAccount = () => {
                           fill=""
                         />
                       </svg>
-                      Addresses
+                      Địa chỉ của tôi
                     </button>
 
                     <button
-                      onClick={() => setActiveTab("account-details")}
+                      onClick={() => setActiveTab("profile")}
                       className={`flex items-center rounded-md gap-2.5 py-3 px-4.5 ease-out duration-200 hover:bg-blue hover:text-white ${
-                        activeTab === "account-details"
+                        activeTab === "profile"
                           ? "text-white bg-blue"
                           : "text-dark-2 bg-gray-1"
                       }`}
@@ -215,7 +323,39 @@ const MyAccount = () => {
                           fill=""
                         />
                       </svg>
-                      Account Details
+                      Thông tin cá nhân
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab("change-password")}
+                      className={`flex items-center rounded-md gap-2.5 py-3 px-4.5 ease-out duration-200 hover:bg-blue hover:text-white ${
+                        activeTab === "change-password"
+                          ? "text-white bg-blue"
+                          : "text-dark-2 bg-gray-1"
+                      }`}
+                    >
+                      <svg
+                        className="fill-current"
+                        width="22"
+                        height="22"
+                        viewBox="0 0 22 22"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M11 1.14581C5.47715 1.14581 1 5.62296 1 11.1458C1 16.6687 5.47715 21.1458 11 21.1458C16.5228 21.1458 21 16.6687 21 11.1458C21 5.62296 16.5228 1.14581 11 1.14581ZM11 2.52081C15.6944 2.52081 19.5 6.32642 19.5 11.1458C19.5 15.9652 15.6944 19.7708 11 19.7708C6.30558 19.7708 2.5 15.9652 2.5 11.1458C2.5 6.32642 6.30558 2.52081 11 2.52081Z"
+                          fill=""
+                        />
+                        <path
+                          d="M11 6.14581C9.48122 6.14581 8.25 7.37703 8.25 8.89581V10.2708C8.25 10.6505 8.55777 10.9583 8.9375 10.9583C9.31723 10.9583 9.625 10.6505 9.625 10.2708V8.89581C9.625 8.20545 10.3096 7.52081 11 7.52081C11.6904 7.52081 12.375 8.20545 12.375 8.89581V10.2708C12.375 10.6505 12.6828 10.9583 13.0625 10.9583C13.4422 10.9583 13.75 10.6505 13.75 10.2708V8.89581C13.75 7.37703 12.5188 6.14581 11 6.14581Z"
+                          fill=""
+                        />
+                        <path
+                          d="M11 12.1458C10.4477 12.1458 10 12.5935 10 13.1458V15.1458C10 15.6981 10.4477 16.1458 11 16.1458C11.5523 16.1458 12 15.6981 12 15.1458V13.1458C12 12.5935 11.5523 12.1458 11 12.1458Z"
+                          fill=""
+                        />
+                      </svg>
+                      Đổi mật khẩu
                     </button>
 
                     <button
@@ -256,32 +396,17 @@ const MyAccount = () => {
             {/* <!-- dashboard tab content start --> */}
 
             <div
-              className={`xl:max-w-[770px] w-full bg-white rounded-xl shadow-1 py-9.5 px-4 sm:px-7.5 xl:px-10 ${
+              className={`xl:max-w-[970px] w-full bg-white rounded-xl shadow-1 py-9.5 px-4 sm:px-7.5 xl:px-10 ${
                 activeTab === "dashboard" ? "block" : "hidden"
               }`}
             >
-              <p className="text-dark">
-                Hello Annie (not Annie?
-                <a
-                  href="#"
-                  className="text-red ease-out duration-200 hover:underline"
-                >
-                  Log Out
-                </a>
-                )
-              </p>
-
-              <p className="text-custom-sm mt-4">
-                From your account dashboard you can view your recent orders,
-                manage your shipping and billing addresses, and edit your
-                password and account details.
-              </p>
+              <DashboardStats />
             </div>
             {/* <!-- dashboard tab content end -->
 
           <!-- orders tab content start --> */}
             <div
-              className={`xl:max-w-[770px] w-full bg-white rounded-xl shadow-1 ${
+              className={`xl:max-w-[970px] w-full bg-white rounded-xl shadow-1 ${
                 activeTab === "orders" ? "block" : "hidden"
               }`}
             >
@@ -289,31 +414,21 @@ const MyAccount = () => {
             </div>
             {/* <!-- orders tab content end -->
 
-          <!-- downloads tab content start --> */}
-            <div
-              className={`xl:max-w-[770px] w-full bg-white rounded-xl shadow-1 py-9.5 px-4 sm:px-7.5 xl:px-10 ${
-                activeTab === "downloads" ? "block" : "hidden"
-              }`}
-            >
-              <p>You don&apos;t have any download</p>
-            </div>
-            {/* <!-- downloads tab content end -->
 
           <!-- addresses tab content start --> */}
             <div
-              className={`flex-col sm:flex-row gap-7.5 ${
-                activeTab === "addresses" ? "flex" : "hidden"
+              className={`xl:max-w-[970px] w-full ${
+                activeTab === "addresses" ? "block" : "hidden"
               }`}
             >
-              <div className="xl:max-w-[370px] w-full bg-white shadow-1 rounded-xl">
-                <div className="flex items-center justify-between py-5 px-4 sm:pl-7.5 sm:pr-6 border-b border-gray-3">
-                  <p className="font-medium text-xl text-dark">
-                    Shipping Address
-                  </p>
-
+              <div className="bg-white rounded-xl shadow-1 p-4 sm:p-7.5">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="font-medium text-xl text-dark">
+                    Địa chỉ của tôi
+                  </h2>
                   <button
-                    className="text-dark ease-out duration-200 hover:text-blue"
-                    onClick={openAddressModal}
+                    className="text-blue ease-out duration-200 hover:text-blue-600 flex items-center gap-2"
+                    onClick={() => openAddressModal()}
                   >
                     <svg
                       className="fill-current"
@@ -330,253 +445,196 @@ const MyAccount = () => {
                         fill=""
                       />
                     </svg>
+                    <span className="hidden sm:inline">Thêm địa chỉ</span>
                   </button>
                 </div>
 
-                <div className="p-4 sm:p-7.5">
-                  <div className="flex flex-col gap-4">
-                    <p className="flex items-center gap-2.5 text-custom-sm">
-                      <svg
-                        className="fill-current"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 18 18"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M9.0001 0.9375C7.03259 0.9375 5.4376 2.53249 5.4376 4.5C5.4376 6.46751 7.03259 8.0625 9.0001 8.0625C10.9676 8.0625 12.5626 6.46751 12.5626 4.5C12.5626 2.53249 10.9676 0.9375 9.0001 0.9375ZM6.5626 4.5C6.5626 3.15381 7.65391 2.0625 9.0001 2.0625C10.3463 2.0625 11.4376 3.15381 11.4376 4.5C11.4376 5.84619 10.3463 6.9375 9.0001 6.9375C7.65391 6.9375 6.5626 5.84619 6.5626 4.5Z"
-                          fill=""
-                        />
-                        <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M9.0001 9.1875C7.26494 9.1875 5.66629 9.58191 4.48169 10.2483C3.31471 10.9047 2.4376 11.8995 2.4376 13.125L2.43755 13.2015C2.4367 14.0729 2.43564 15.1665 3.39491 15.9477C3.86701 16.3321 4.52746 16.6055 5.41976 16.7861C6.31455 16.9672 7.48077 17.0625 9.0001 17.0625C10.5194 17.0625 11.6857 16.9672 12.5804 16.7861C13.4727 16.6055 14.1332 16.3321 14.6053 15.9477C15.5646 15.1665 15.5635 14.0729 15.5626 13.2015L15.5626 13.125C15.5626 11.8995 14.6855 10.9047 13.5185 10.2483C12.3339 9.58191 10.7353 9.1875 9.0001 9.1875ZM3.5626 13.125C3.5626 12.4865 4.02863 11.7939 5.03323 11.2288C6.0202 10.6736 7.42156 10.3125 9.0001 10.3125C10.5786 10.3125 11.98 10.6736 12.967 11.2288C13.9716 11.7939 14.4376 12.4865 14.4376 13.125C14.4376 14.1059 14.4074 14.658 13.8949 15.0753C13.617 15.3016 13.1525 15.5225 12.3573 15.6835C11.5645 15.8439 10.4808 15.9375 9.0001 15.9375C7.51943 15.9375 6.43565 15.8439 5.64294 15.6835C4.84774 15.5225 4.38319 15.3016 4.10529 15.0753C3.59284 14.658 3.5626 14.1059 3.5626 13.125Z"
-                          fill=""
-                        />
-                      </svg>
-                      Name: James Septimus
-                    </p>
-
-                    <p className="flex items-center gap-2.5 text-custom-sm">
-                      <svg
-                        className="fill-current"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 18 18"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M7.45769 2.4375H10.5423C11.9206 2.43749 13.0124 2.43748 13.8668 2.55235C14.7461 2.67057 15.4578 2.91966 16.0191 3.48093C16.5803 4.04221 16.8294 4.75392 16.9476 5.63323C17.0625 6.48764 17.0625 7.57937 17.0625 8.95769V9.04231C17.0625 10.4206 17.0625 11.5124 16.9476 12.3668C16.8294 13.2461 16.5803 13.9578 16.0191 14.5191C15.4578 15.0803 14.7461 15.3294 13.8668 15.4476C13.0124 15.5625 11.9206 15.5625 10.5423 15.5625H7.45769C6.07937 15.5625 4.98764 15.5625 4.13323 15.4476C3.25392 15.3294 2.54221 15.0803 1.98093 14.5191C1.41966 13.9578 1.17057 13.2461 1.05235 12.3668C0.937479 11.5124 0.937488 10.4206 0.9375 9.04231V8.95769C0.937488 7.57937 0.937479 6.48764 1.05235 5.63323C1.17057 4.75392 1.41966 4.04221 1.98093 3.48093C2.54221 2.91966 3.25392 2.67057 4.13323 2.55235C4.98764 2.43748 6.07937 2.43749 7.45769 2.4375ZM4.28314 3.66732C3.52857 3.76877 3.09384 3.95902 2.77643 4.27643C2.45902 4.59384 2.26877 5.02857 2.16732 5.78314C2.0637 6.55389 2.0625 7.56989 2.0625 9C2.0625 10.4301 2.0637 11.4461 2.16732 12.2169C2.26877 12.9714 2.45902 13.4062 2.77643 13.7236C3.09384 14.041 3.52857 14.2312 4.28314 14.3327C5.05388 14.4363 6.06988 14.4375 7.5 14.4375H10.5C11.9301 14.4375 12.9461 14.4363 13.7169 14.3327C14.4714 14.2312 14.9062 14.041 15.2236 13.7236C15.541 13.4062 15.7312 12.9714 15.8327 12.2169C15.9363 11.4461 15.9375 10.4301 15.9375 9C15.9375 7.56989 15.9363 6.55389 15.8327 5.78314C15.7312 5.02857 15.541 4.59384 15.2236 4.27643C14.9062 3.95902 14.4714 3.76877 13.7169 3.66732C12.9461 3.5637 11.9301 3.5625 10.5 3.5625H7.5C6.06989 3.5625 5.05389 3.5637 4.28314 3.66732ZM4.06788 5.6399C4.26676 5.40124 4.62145 5.369 4.8601 5.56788L6.47928 6.91719C7.179 7.50029 7.6648 7.90381 8.07494 8.1676C8.47196 8.42294 8.7412 8.50866 9 8.50866C9.2588 8.50866 9.52804 8.42294 9.92506 8.1676C10.3352 7.90381 10.821 7.50029 11.5207 6.91718L13.1399 5.56788C13.3786 5.369 13.7332 5.40124 13.9321 5.6399C14.131 5.87855 14.0988 6.23325 13.8601 6.43213L12.2127 7.80493C11.548 8.35892 11.0092 8.80794 10.5336 9.11379C10.0382 9.4324 9.55581 9.63366 9 9.63366C8.44419 9.63366 7.96176 9.4324 7.46638 9.11379C6.99084 8.80794 6.45204 8.35893 5.78727 7.80494L4.1399 6.43213C3.90124 6.23324 3.869 5.87855 4.06788 5.6399Z"
-                          fill=""
-                        />
-                      </svg>
-                      Email: jamse@example.com
-                    </p>
-
-                    <p className="flex items-center gap-2.5 text-custom-sm">
-                      <svg
-                        className="fill-current"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 18 18"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M9.94471 1.41012C9.99436 1.10345 10.2843 0.895419 10.5909 0.945068C10.6099 0.948701 10.671 0.960116 10.703 0.967243C10.767 0.981496 10.8563 1.00344 10.9676 1.03586C11.1901 1.10069 11.5011 1.20749 11.8743 1.3786C12.6215 1.72116 13.6159 2.32042 14.6477 3.35227C15.6796 4.38412 16.2788 5.37848 16.6214 6.12568C16.7925 6.4989 16.8993 6.80985 16.9641 7.03243C16.9966 7.14374 17.0185 7.23301 17.0328 7.297C17.0399 7.32901 17.0451 7.3547 17.0487 7.37368L17.053 7.39708C17.1027 7.70375 16.8965 8.00564 16.5899 8.05528C16.2841 8.10479 15.996 7.89776 15.9451 7.59254C15.9436 7.58434 15.9393 7.56232 15.9347 7.54156C15.9254 7.50002 15.9094 7.43415 15.884 7.34704C15.8333 7.17279 15.7451 6.91379 15.5987 6.59453C15.3064 5.9568 14.7806 5.07616 13.8522 4.14776C12.9238 3.21936 12.0432 2.69362 11.4055 2.40125C11.0862 2.25488 10.8272 2.16673 10.653 2.11597C10.5658 2.0906 10.4563 2.06547 10.4148 2.05622C10.1096 2.00535 9.89521 1.71591 9.94471 1.41012Z"
-                          fill=""
-                        />
-                        <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M10.1144 3.99722C10.1997 3.69851 10.5111 3.52555 10.8098 3.61089L10.6553 4.15175C10.8098 3.61089 10.8098 3.61089 10.8098 3.61089L10.8109 3.6112L10.812 3.61153L10.8145 3.61226L10.8203 3.614L10.8352 3.61862C10.8465 3.62224 10.8606 3.62695 10.8774 3.63292C10.9111 3.64487 10.9556 3.66187 11.0102 3.68528C11.1195 3.7321 11.2688 3.80442 11.4522 3.91295C11.8193 4.13021 12.3204 4.4911 12.9092 5.07982C13.4979 5.66855 13.8588 6.16969 14.076 6.53679C14.1846 6.72018 14.2569 6.86947 14.3037 6.97874C14.3271 7.03334 14.3441 7.07786 14.3561 7.11154C14.362 7.12838 14.3667 7.1425 14.3704 7.15381L14.375 7.16865L14.3767 7.17447L14.3775 7.17697L14.3778 7.17812C14.3778 7.17812 14.3781 7.1792 13.8372 7.33373L14.3781 7.1792C14.4634 7.4779 14.2905 7.78924 13.9918 7.87458C13.6956 7.9592 13.387 7.78988 13.2986 7.49584L13.2958 7.48775C13.2918 7.47649 13.2836 7.4543 13.2697 7.4219C13.2419 7.35714 13.1916 7.25122 13.1079 7.10978C12.9407 6.82722 12.6386 6.40028 12.1137 5.87532C11.5887 5.35036 11.1618 5.04833 10.8792 4.8811C10.7378 4.79739 10.6318 4.74706 10.5671 4.71931C10.5347 4.70543 10.5125 4.69715 10.5012 4.69315L10.4931 4.69038C10.1991 4.60197 10.0298 4.29339 10.1144 3.99722Z"
-                          fill=""
-                        />
-                        <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M3.75559 3.30519C5.01564 2.04514 7.142 2.14093 8.01936 3.71302L8.50612 4.58522C9.07906 5.61183 8.8349 6.90714 7.99618 7.75612C7.98501 7.77142 7.92581 7.85762 7.91843 8.00823C7.90902 8.20047 7.97729 8.64506 8.66611 9.33388C9.35471 10.0225 9.79924 10.0909 9.99156 10.0816C10.1423 10.0742 10.2286 10.015 10.2439 10.0038C11.0929 9.16509 12.3882 8.92094 13.4148 9.49387L14.287 9.98063C15.8591 10.858 15.9549 12.9844 14.6948 14.2444C14.0208 14.9184 13.1246 15.5173 12.0715 15.5572C10.5108 15.6164 7.91935 15.2133 5.35301 12.647C2.78667 10.0806 2.38363 7.48922 2.4428 5.92852C2.48272 4.87537 3.08159 3.97918 3.75559 3.30519ZM7.03699 4.26127C6.58773 3.45626 5.38046 3.27131 4.55108 4.10068C3.96957 4.6822 3.59152 5.32406 3.56699 5.97114C3.51765 7.27264 3.83898 9.54196 6.14851 11.8515C8.45803 14.161 10.7273 14.4823 12.0289 14.433C12.6759 14.4085 13.3178 14.0304 13.8993 13.4489C14.7287 12.6195 14.5437 11.4123 13.7387 10.963L12.8665 10.4762C12.324 10.1735 11.5619 10.2767 11.0269 10.8117C10.9743 10.8642 10.6398 11.1764 10.0462 11.2052C9.43855 11.2348 8.703 10.9618 7.87062 10.1294C7.03796 9.29672 6.76502 8.56097 6.79478 7.95322C6.82384 7.35958 7.13601 7.02538 7.18824 6.97314C7.72323 6.43815 7.82654 5.67602 7.52375 5.13346L7.03699 4.26127Z"
-                          fill=""
-                        />
-                      </svg>
-                      Phone: 1234 567890
-                    </p>
-
-                    <p className="flex gap-2.5 text-custom-sm">
-                      <svg
-                        className="fill-current mt-0.5"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 18 18"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <g clipPath="url(#clip0_100_6003)">
-                          <path
-                            fillRule="evenodd"
-                            clipRule="evenodd"
-                            d="M3.1875 6.38598C3.1875 3.33948 5.8286 0.9375 9 0.9375C12.1714 0.9375 14.8125 3.33948 14.8125 6.38598C14.8125 9.24433 13.0403 12.6 10.1811 13.8219C9.43046 14.1427 8.56954 14.1427 7.81891 13.8219C4.95967 12.6 3.1875 9.24433 3.1875 6.38598ZM9 2.0625C6.37241 2.0625 4.3125 4.03557 4.3125 6.38598C4.3125 8.88223 5.89157 11.7749 8.26099 12.7874C8.72925 12.9875 9.27075 12.9875 9.73901 12.7874C12.1084 11.7749 13.6875 8.88223 13.6875 6.38598C13.6875 4.03557 11.6276 2.0625 9 2.0625ZM9 5.8125C8.48223 5.8125 8.0625 6.23223 8.0625 6.75C8.0625 7.26777 8.48223 7.6875 9 7.6875C9.51777 7.6875 9.9375 7.26777 9.9375 6.75C9.9375 6.23223 9.51777 5.8125 9 5.8125ZM6.9375 6.75C6.9375 5.61091 7.86091 4.6875 9 4.6875C10.1391 4.6875 11.0625 5.61091 11.0625 6.75C11.0625 7.88909 10.1391 8.8125 9 8.8125C7.86091 8.8125 6.9375 7.88909 6.9375 6.75ZM2.69656 11.2474C2.90508 11.4777 2.88744 11.8334 2.65716 12.042C2.23139 12.4275 2.0625 12.7965 2.0625 13.125C2.0625 13.6978 2.60551 14.4036 3.92753 14.9985C5.19675 15.5697 6.98964 15.9375 9 15.9375C11.0104 15.9375 12.8032 15.5697 14.0725 14.9985C15.3945 14.4036 15.9375 13.6978 15.9375 13.125C15.9375 12.7966 15.7686 12.4275 15.3428 12.042C15.1126 11.8334 15.0949 11.4777 15.3034 11.2474C15.512 11.0172 15.8677 10.9995 16.098 11.208C16.6702 11.7262 17.0625 12.3758 17.0625 13.125C17.0625 14.4162 15.9266 15.3978 14.5341 16.0244C13.0889 16.6748 11.1318 17.0625 9 17.0625C6.86823 17.0625 4.91111 16.6748 3.46587 16.0244C2.07342 15.3978 0.9375 14.4162 0.9375 13.125C0.9375 12.3758 1.32979 11.7262 1.90204 11.208C2.13232 10.9995 2.48804 11.0172 2.69656 11.2474Z"
-                            fill=""
-                          />
-                        </g>
-                        <defs>
-                          <clipPath id="clip0_100_6003">
-                            <rect width="18" height="18" fill="white" />
-                          </clipPath>
-                        </defs>
-                      </svg>
-                      Address: 7398 Smoke Ranch RoadLas Vegas, Nevada 89128
-                    </p>
+                {addressesLoading ? (
+                  <div className="text-center py-12">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue"></div>
+                    <p className="mt-4 text-gray-600">Đang tải địa chỉ...</p>
                   </div>
-                </div>
-              </div>
-
-              <div className="xl:max-w-[370px] w-full bg-white shadow-1 rounded-xl">
-                <div className="flex items-center justify-between py-5 px-4 sm:pl-7.5 sm:pr-6 border-b border-gray-3">
-                  <p className="font-medium text-xl text-dark">
-                    Billing Address
-                  </p>
-
-                  <button
-                    className="text-dark ease-out duration-200 hover:text-blue"
-                    onClick={openAddressModal}
-                  >
+                ) : addresses.length === 0 ? (
+                  <div className="text-center py-12">
                     <svg
-                      className="fill-current"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 20 20"
+                      className="mx-auto h-16 w-16 text-gray-400"
                       fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
                       <path
-                        fillRule="evenodd"
-                        clipRule="evenodd"
-                        d="M9.95349 1.04163L11.2513 1.04163C11.5965 1.04163 11.8763 1.32145 11.8763 1.66663C11.8763 2.0118 11.5965 2.29163 11.2513 2.29163H10.0013C8.01945 2.29163 6.59593 2.29295 5.51262 2.4386C4.44728 2.58183 3.80501 2.85424 3.3303 3.32896C2.85559 3.80367 2.58318 4.44594 2.43994 5.51127C2.2943 6.59459 2.29297 8.01811 2.29297 9.99996C2.29297 11.9818 2.2943 13.4053 2.43994 14.4886C2.58318 15.554 2.85559 16.1962 3.3303 16.671C3.80501 17.1457 4.44728 17.4181 5.51262 17.5613C6.59593 17.707 8.01945 17.7083 10.0013 17.7083C11.9832 17.7083 13.4067 17.707 14.49 17.5613C15.5553 17.4181 16.1976 17.1457 16.6723 16.671C17.147 16.1962 17.4194 15.554 17.5627 14.4886C17.7083 13.4053 17.7096 11.9818 17.7096 9.99996V8.74996C17.7096 8.40478 17.9895 8.12496 18.3346 8.12496C18.6798 8.12496 18.9596 8.40478 18.9596 8.74996V10.0478C18.9596 11.9714 18.9597 13.479 18.8015 14.6552C18.6396 15.8592 18.3019 16.8092 17.5562 17.5548C16.8105 18.3005 15.8605 18.6383 14.6565 18.8002C13.4803 18.9583 11.9728 18.9583 10.0491 18.9583H9.95349C8.02983 18.9583 6.5223 18.9583 5.34606 18.8002C4.14211 18.6383 3.19209 18.3005 2.44642 17.5548C1.70074 16.8092 1.36296 15.8592 1.20109 14.6552C1.04295 13.479 1.04296 11.9714 1.04297 10.0478V9.95214C1.04296 8.02848 1.04295 6.52095 1.20109 5.34471C1.36296 4.14077 1.70074 3.19075 2.44642 2.44507C3.19209 1.6994 4.14211 1.36161 5.34606 1.19975C6.5223 1.04161 8.02983 1.04162 9.95349 1.04163ZM13.9767 1.89656C15.1167 0.75665 16.9648 0.75665 18.1047 1.89656C19.2446 3.03646 19.2446 4.88461 18.1047 6.02452L12.5646 11.5646C12.2552 11.874 12.0614 12.0679 11.8451 12.2366C11.5904 12.4353 11.3147 12.6056 11.0231 12.7446C10.7755 12.8626 10.5154 12.9493 10.1003 13.0876L7.67985 13.8945C7.23298 14.0434 6.74031 13.9271 6.40723 13.594C6.07415 13.261 5.95785 12.7683 6.1068 12.3214L6.91361 9.90098C7.05196 9.48584 7.13862 9.22579 7.25663 8.97817C7.39563 8.68652 7.56598 8.41089 7.76467 8.15614C7.93338 7.93985 8.12722 7.74603 8.43667 7.43662L13.9767 1.89656ZM17.2208 2.78044C16.5691 2.12869 15.5124 2.12869 14.8606 2.78044L14.5468 3.09429C14.5657 3.17417 14.5922 3.26935 14.629 3.37551C14.7484 3.71973 14.9744 4.17305 15.4013 4.59995C15.8282 5.02685 16.2815 5.25285 16.6257 5.37227C16.7319 5.4091 16.8271 5.43556 16.907 5.45448L17.2208 5.14063C17.8726 4.48888 17.8726 3.43219 17.2208 2.78044ZM15.9223 6.4392C15.4923 6.25429 14.9914 5.95784 14.5174 5.48384C14.0434 5.00983 13.747 4.50898 13.5621 4.07901L9.34922 8.29184C9.00213 8.63894 8.866 8.77659 8.75031 8.92492C8.60745 9.10808 8.48497 9.30625 8.38504 9.51594C8.30411 9.68576 8.24187 9.86907 8.08664 10.3347L7.72673 11.4145L8.58678 12.2745L9.66651 11.9146C10.1322 11.7594 10.3155 11.6972 10.4853 11.6162C10.695 11.5163 10.8932 11.3938 11.0763 11.2509C11.2247 11.1353 11.3623 10.9991 11.7094 10.652L15.9223 6.4392Z"
-                        fill=""
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                       />
                     </svg>
-                  </button>
-                </div>
-
-                <div className="p-4 sm:p-7.5">
-                  <div className="flex flex-col gap-4">
-                    <p className="flex items-center gap-2.5 text-custom-sm">
+                    <h3 className="mt-4 text-lg font-medium text-gray-900">
+                      Chưa có địa chỉ nào
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Hãy thêm địa chỉ mới để bắt đầu
+                    </p>
+                    <button
+                      onClick={() => openAddressModal()}
+                      className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-blue text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
                       <svg
-                        className="fill-current"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 18 18"
+                        className="w-5 h-5"
                         fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
                         <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M9.0001 0.9375C7.03259 0.9375 5.4376 2.53249 5.4376 4.5C5.4376 6.46751 7.03259 8.0625 9.0001 8.0625C10.9676 8.0625 12.5626 6.46751 12.5626 4.5C12.5626 2.53249 10.9676 0.9375 9.0001 0.9375ZM6.5626 4.5C6.5626 3.15381 7.65391 2.0625 9.0001 2.0625C10.3463 2.0625 11.4376 3.15381 11.4376 4.5C11.4376 5.84619 10.3463 6.9375 9.0001 6.9375C7.65391 6.9375 6.5626 5.84619 6.5626 4.5Z"
-                          fill=""
-                        />
-                        <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M9.0001 9.1875C7.26494 9.1875 5.66629 9.58191 4.48169 10.2483C3.31471 10.9047 2.4376 11.8995 2.4376 13.125L2.43755 13.2015C2.4367 14.0729 2.43564 15.1665 3.39491 15.9477C3.86701 16.3321 4.52746 16.6055 5.41976 16.7861C6.31455 16.9672 7.48077 17.0625 9.0001 17.0625C10.5194 17.0625 11.6857 16.9672 12.5804 16.7861C13.4727 16.6055 14.1332 16.3321 14.6053 15.9477C15.5646 15.1665 15.5635 14.0729 15.5626 13.2015L15.5626 13.125C15.5626 11.8995 14.6855 10.9047 13.5185 10.2483C12.3339 9.58191 10.7353 9.1875 9.0001 9.1875ZM3.5626 13.125C3.5626 12.4865 4.02863 11.7939 5.03323 11.2288C6.0202 10.6736 7.42156 10.3125 9.0001 10.3125C10.5786 10.3125 11.98 10.6736 12.967 11.2288C13.9716 11.7939 14.4376 12.4865 14.4376 13.125C14.4376 14.1059 14.4074 14.658 13.8949 15.0753C13.617 15.3016 13.1525 15.5225 12.3573 15.6835C11.5645 15.8439 10.4808 15.9375 9.0001 15.9375C7.51943 15.9375 6.43565 15.8439 5.64294 15.6835C4.84774 15.5225 4.38319 15.3016 4.10529 15.0753C3.59284 14.658 3.5626 14.1059 3.5626 13.125Z"
-                          fill=""
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
                         />
                       </svg>
-                      Name: James Septimus
-                    </p>
-
-                    <p className="flex items-center gap-2.5 text-custom-sm">
-                      <svg
-                        className="fill-current"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 18 18"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M7.45769 2.4375H10.5423C11.9206 2.43749 13.0124 2.43748 13.8668 2.55235C14.7461 2.67057 15.4578 2.91966 16.0191 3.48093C16.5803 4.04221 16.8294 4.75392 16.9476 5.63323C17.0625 6.48764 17.0625 7.57937 17.0625 8.95769V9.04231C17.0625 10.4206 17.0625 11.5124 16.9476 12.3668C16.8294 13.2461 16.5803 13.9578 16.0191 14.5191C15.4578 15.0803 14.7461 15.3294 13.8668 15.4476C13.0124 15.5625 11.9206 15.5625 10.5423 15.5625H7.45769C6.07937 15.5625 4.98764 15.5625 4.13323 15.4476C3.25392 15.3294 2.54221 15.0803 1.98093 14.5191C1.41966 13.9578 1.17057 13.2461 1.05235 12.3668C0.937479 11.5124 0.937488 10.4206 0.9375 9.04231V8.95769C0.937488 7.57937 0.937479 6.48764 1.05235 5.63323C1.17057 4.75392 1.41966 4.04221 1.98093 3.48093C2.54221 2.91966 3.25392 2.67057 4.13323 2.55235C4.98764 2.43748 6.07937 2.43749 7.45769 2.4375ZM4.28314 3.66732C3.52857 3.76877 3.09384 3.95902 2.77643 4.27643C2.45902 4.59384 2.26877 5.02857 2.16732 5.78314C2.0637 6.55389 2.0625 7.56989 2.0625 9C2.0625 10.4301 2.0637 11.4461 2.16732 12.2169C2.26877 12.9714 2.45902 13.4062 2.77643 13.7236C3.09384 14.041 3.52857 14.2312 4.28314 14.3327C5.05388 14.4363 6.06988 14.4375 7.5 14.4375H10.5C11.9301 14.4375 12.9461 14.4363 13.7169 14.3327C14.4714 14.2312 14.9062 14.041 15.2236 13.7236C15.541 13.4062 15.7312 12.9714 15.8327 12.2169C15.9363 11.4461 15.9375 10.4301 15.9375 9C15.9375 7.56989 15.9363 6.55389 15.8327 5.78314C15.7312 5.02857 15.541 4.59384 15.2236 4.27643C14.9062 3.95902 14.4714 3.76877 13.7169 3.66732C12.9461 3.5637 11.9301 3.5625 10.5 3.5625H7.5C6.06989 3.5625 5.05389 3.5637 4.28314 3.66732ZM4.06788 5.6399C4.26676 5.40124 4.62145 5.369 4.8601 5.56788L6.47928 6.91719C7.179 7.50029 7.6648 7.90381 8.07494 8.1676C8.47196 8.42294 8.7412 8.50866 9 8.50866C9.2588 8.50866 9.52804 8.42294 9.92506 8.1676C10.3352 7.90381 10.821 7.50029 11.5207 6.91718L13.1399 5.56788C13.3786 5.369 13.7332 5.40124 13.9321 5.6399C14.131 5.87855 14.0988 6.23325 13.8601 6.43213L12.2127 7.80493C11.548 8.35892 11.0092 8.80794 10.5336 9.11379C10.0382 9.4324 9.55581 9.63366 9 9.63366C8.44419 9.63366 7.96176 9.4324 7.46638 9.11379C6.99084 8.80794 6.45204 8.35893 5.78727 7.80494L4.1399 6.43213C3.90124 6.23324 3.869 5.87855 4.06788 5.6399Z"
-                          fill=""
-                        />
-                      </svg>
-                      Email: jamse@example.com
-                    </p>
-
-                    <p className="flex items-center gap-2.5 text-custom-sm">
-                      <svg
-                        className="fill-current"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 18 18"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M9.94471 1.41012C9.99436 1.10345 10.2843 0.895419 10.5909 0.945068C10.6099 0.948701 10.671 0.960116 10.703 0.967243C10.767 0.981496 10.8563 1.00344 10.9676 1.03586C11.1901 1.10069 11.5011 1.20749 11.8743 1.3786C12.6215 1.72116 13.6159 2.32042 14.6477 3.35227C15.6796 4.38412 16.2788 5.37848 16.6214 6.12568C16.7925 6.4989 16.8993 6.80985 16.9641 7.03243C16.9966 7.14374 17.0185 7.23301 17.0328 7.297C17.0399 7.32901 17.0451 7.3547 17.0487 7.37368L17.053 7.39708C17.1027 7.70375 16.8965 8.00564 16.5899 8.05528C16.2841 8.10479 15.996 7.89776 15.9451 7.59254C15.9436 7.58434 15.9393 7.56232 15.9347 7.54156C15.9254 7.50002 15.9094 7.43415 15.884 7.34704C15.8333 7.17279 15.7451 6.91379 15.5987 6.59453C15.3064 5.9568 14.7806 5.07616 13.8522 4.14776C12.9238 3.21936 12.0432 2.69362 11.4055 2.40125C11.0862 2.25488 10.8272 2.16673 10.653 2.11597C10.5658 2.0906 10.4563 2.06547 10.4148 2.05622C10.1096 2.00535 9.89521 1.71591 9.94471 1.41012Z"
-                          fill=""
-                        />
-                        <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M10.1144 3.99722C10.1997 3.69851 10.5111 3.52555 10.8098 3.61089L10.6553 4.15175C10.8098 3.61089 10.8098 3.61089 10.8098 3.61089L10.8109 3.6112L10.812 3.61153L10.8145 3.61226L10.8203 3.614L10.8352 3.61862C10.8465 3.62224 10.8606 3.62695 10.8774 3.63292C10.9111 3.64487 10.9556 3.66187 11.0102 3.68528C11.1195 3.7321 11.2688 3.80442 11.4522 3.91295C11.8193 4.13021 12.3204 4.4911 12.9092 5.07982C13.4979 5.66855 13.8588 6.16969 14.076 6.53679C14.1846 6.72018 14.2569 6.86947 14.3037 6.97874C14.3271 7.03334 14.3441 7.07786 14.3561 7.11154C14.362 7.12838 14.3667 7.1425 14.3704 7.15381L14.375 7.16865L14.3767 7.17447L14.3775 7.17697L14.3778 7.17812C14.3778 7.17812 14.3781 7.1792 13.8372 7.33373L14.3781 7.1792C14.4634 7.4779 14.2905 7.78924 13.9918 7.87458C13.6956 7.9592 13.387 7.78988 13.2986 7.49584L13.2958 7.48775C13.2918 7.47649 13.2836 7.4543 13.2697 7.4219C13.2419 7.35714 13.1916 7.25122 13.1079 7.10978C12.9407 6.82722 12.6386 6.40028 12.1137 5.87532C11.5887 5.35036 11.1618 5.04833 10.8792 4.8811C10.7378 4.79739 10.6318 4.74706 10.5671 4.71931C10.5347 4.70543 10.5125 4.69715 10.5012 4.69315L10.4931 4.69038C10.1991 4.60197 10.0298 4.29339 10.1144 3.99722Z"
-                          fill=""
-                        />
-                        <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M3.75559 3.30519C5.01564 2.04514 7.142 2.14093 8.01936 3.71302L8.50612 4.58522C9.07906 5.61183 8.8349 6.90714 7.99618 7.75612C7.98501 7.77142 7.92581 7.85762 7.91843 8.00823C7.90902 8.20047 7.97729 8.64506 8.66611 9.33388C9.35471 10.0225 9.79924 10.0909 9.99156 10.0816C10.1423 10.0742 10.2286 10.015 10.2439 10.0038C11.0929 9.16509 12.3882 8.92094 13.4148 9.49387L14.287 9.98063C15.8591 10.858 15.9549 12.9844 14.6948 14.2444C14.0208 14.9184 13.1246 15.5173 12.0715 15.5572C10.5108 15.6164 7.91935 15.2133 5.35301 12.647C2.78667 10.0806 2.38363 7.48922 2.4428 5.92852C2.48272 4.87537 3.08159 3.97918 3.75559 3.30519ZM7.03699 4.26127C6.58773 3.45626 5.38046 3.27131 4.55108 4.10068C3.96957 4.6822 3.59152 5.32406 3.56699 5.97114C3.51765 7.27264 3.83898 9.54196 6.14851 11.8515C8.45803 14.161 10.7273 14.4823 12.0289 14.433C12.6759 14.4085 13.3178 14.0304 13.8993 13.4489C14.7287 12.6195 14.5437 11.4123 13.7387 10.963L12.8665 10.4762C12.324 10.1735 11.5619 10.2767 11.0269 10.8117C10.9743 10.8642 10.6398 11.1764 10.0462 11.2052C9.43855 11.2348 8.703 10.9618 7.87062 10.1294C7.03796 9.29672 6.76502 8.56097 6.79478 7.95322C6.82384 7.35958 7.13601 7.02538 7.18824 6.97314C7.72323 6.43815 7.82654 5.67602 7.52375 5.13346L7.03699 4.26127Z"
-                          fill=""
-                        />
-                      </svg>
-                      Phone: 1234 567890
-                    </p>
-
-                    <p className="flex gap-2.5 text-custom-sm">
-                      <svg
-                        className="fill-current mt-0.5"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 18 18"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <g clipPath="url(#clip0_100_6003)">
-                          <path
-                            fillRule="evenodd"
-                            clipRule="evenodd"
-                            d="M3.1875 6.38598C3.1875 3.33948 5.8286 0.9375 9 0.9375C12.1714 0.9375 14.8125 3.33948 14.8125 6.38598C14.8125 9.24433 13.0403 12.6 10.1811 13.8219C9.43046 14.1427 8.56954 14.1427 7.81891 13.8219C4.95967 12.6 3.1875 9.24433 3.1875 6.38598ZM9 2.0625C6.37241 2.0625 4.3125 4.03557 4.3125 6.38598C4.3125 8.88223 5.89157 11.7749 8.26099 12.7874C8.72925 12.9875 9.27075 12.9875 9.73901 12.7874C12.1084 11.7749 13.6875 8.88223 13.6875 6.38598C13.6875 4.03557 11.6276 2.0625 9 2.0625ZM9 5.8125C8.48223 5.8125 8.0625 6.23223 8.0625 6.75C8.0625 7.26777 8.48223 7.6875 9 7.6875C9.51777 7.6875 9.9375 7.26777 9.9375 6.75C9.9375 6.23223 9.51777 5.8125 9 5.8125ZM6.9375 6.75C6.9375 5.61091 7.86091 4.6875 9 4.6875C10.1391 4.6875 11.0625 5.61091 11.0625 6.75C11.0625 7.88909 10.1391 8.8125 9 8.8125C7.86091 8.8125 6.9375 7.88909 6.9375 6.75ZM2.69656 11.2474C2.90508 11.4777 2.88744 11.8334 2.65716 12.042C2.23139 12.4275 2.0625 12.7965 2.0625 13.125C2.0625 13.6978 2.60551 14.4036 3.92753 14.9985C5.19675 15.5697 6.98964 15.9375 9 15.9375C11.0104 15.9375 12.8032 15.5697 14.0725 14.9985C15.3945 14.4036 15.9375 13.6978 15.9375 13.125C15.9375 12.7966 15.7686 12.4275 15.3428 12.042C15.1126 11.8334 15.0949 11.4777 15.3034 11.2474C15.512 11.0172 15.8677 10.9995 16.098 11.208C16.6702 11.7262 17.0625 12.3758 17.0625 13.125C17.0625 14.4162 15.9266 15.3978 14.5341 16.0244C13.0889 16.6748 11.1318 17.0625 9 17.0625C6.86823 17.0625 4.91111 16.6748 3.46587 16.0244C2.07342 15.3978 0.9375 14.4162 0.9375 13.125C0.9375 12.3758 1.32979 11.7262 1.90204 11.208C2.13232 10.9995 2.48804 11.0172 2.69656 11.2474Z"
-                            fill=""
-                          />
-                        </g>
-                        <defs>
-                          <clipPath id="clip0_100_6003">
-                            <rect width="18" height="18" fill="white" />
-                          </clipPath>
-                        </defs>
-                      </svg>
-                      Address: 7398 Smoke Ranch RoadLas Vegas, Nevada 89128
-                    </p>
+                      Thêm địa chỉ
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                    <div
+                      className="flex gap-4 pb-4"
+                      style={{ minWidth: "max-content" }}
+                    >
+                      {addresses.map((address) => (
+                        <div
+                          key={address.id}
+                          className={`flex-shrink-0 w-full sm:w-80 bg-gray-1 rounded-xl p-5 border-2 ${
+                            address.isDefault ? "border-blue" : "border-gray-3"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-medium text-dark text-lg">
+                                {address.fullName}
+                              </h3>
+                              {address.isDefault && (
+                                <span className="px-2 py-0.5 text-xs font-medium bg-blue text-white rounded">
+                                  Mặc định
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              className="text-gray-500 hover:text-blue transition-colors"
+                              onClick={() => openAddressModal(address)}
+                              title="Chỉnh sửa"
+                            >
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+
+                          <div className="space-y-2 text-custom-sm text-gray-700">
+                            {address.phone && (
+                              <p className="flex items-center gap-2">
+                                <svg
+                                  className="w-4 h-4 text-gray-500"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                                  />
+                                </svg>
+                                {address.phone}
+                              </p>
+                            )}
+
+                            <p className="flex items-start gap-2">
+                              <svg
+                                className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                              </svg>
+                              <span>
+                                {address.address}, {address.ward},{" "}
+                                {address.district}, {address.city}
+                                {address.postalCode &&
+                                  ` - ${address.postalCode}`}
+                              </span>
+                            </p>
+
+                            {address.addressType && (
+                              <p className="text-xs text-gray-500 mt-3">
+                                Loại:{" "}
+                                {address.addressType === "home"
+                                  ? "Nhà riêng"
+                                  : "Văn phòng"}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             {/* <!-- addresses tab content end -->
 
           <!-- details tab content start --> */}
+            {/* <!-- profile tab content start --> */}
             <div
-              className={`xl:max-w-[770px] w-full ${
-                activeTab === "account-details" ? "block" : "hidden"
+              className={`xl:max-w-[970px] w-full ${
+                activeTab === "profile" ? "block" : "hidden"
               }`}
             >
+              <ProfileTab />
+            </div>
+            {/* <!-- profile tab content end -->
+
+          <!-- change password tab content start --> */}
+            <div
+              className={`xl:max-w-[970px] w-full ${
+                activeTab === "change-password" ? "block" : "hidden"
+              }`}
+            >
+              <ChangePasswordTab />
+            </div>
+            {/* <!-- change password tab content end -->
+          <!--== user dashboard content end ==--> */}
+            {/* Old form removed - replaced with ProfileTab and ChangePasswordTab */}
+            <div className="hidden">
               <form>
                 <div className="bg-white shadow-1 rounded-xl p-4 sm:p-8.5">
                   <div className="flex flex-col lg:flex-row gap-5 sm:gap-8 mb-5">
@@ -721,7 +779,11 @@ const MyAccount = () => {
         </div>
       </section>
 
-      <AddressModal isOpen={addressModal} closeModal={closeAddressModal} />
+      <AddressModal
+        isOpen={addressModal}
+        closeModal={closeAddressModal}
+        address={editingAddress}
+      />
     </>
   );
 };

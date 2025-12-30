@@ -9,8 +9,15 @@ export type ProductAttributeOption = {
   price?: number; // Additional price for this option (optional)
 };
 
+export type ProductColor = {
+  id: string;
+  label: string;
+  hex: string;
+  price?: number; // Optional additional price for this color
+};
+
 export type ProductAttributes = {
-  colors?: Array<string | { id: string; title: string; price?: number }>; // Can be simple string array or object with price
+  colors?: Array<ProductColor | string>; // Can be ProductColor object or legacy string (for backward compatibility)
   storage?: Array<ProductAttributeOption>;
   type?: Array<ProductAttributeOption>;
   sim?: Array<ProductAttributeOption>;

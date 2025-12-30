@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useCartStore } from "@/stores/cart-store";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { formatPrice } from "@/utils/formatPrice";
 
 const SingleItem = ({ item }) => {
   const removeItemFromCart = useCartStore((state) => state.removeItemFromCart);
@@ -27,12 +28,12 @@ const SingleItem = ({ item }) => {
   const handleRemoveFromCart = async () => {
     try {
       await removeItemFromCart(item.cartItemId);
-      toast.success(`${item.title} has been removed from the cart`, {
+      toast.success(`${item.title} đã được xóa khỏi giỏ hàng`, {
         duration: 3000,
         icon: "🗑️",
       });
     } catch (error) {
-      toast.error("Cannot remove product. Please try again.");
+      toast.error("Không thể xóa sản phẩm. Vui lòng thử lại.");
     }
   };
 
@@ -69,9 +70,9 @@ const SingleItem = ({ item }) => {
   const optionsText = formatOptions();
 
   return (
-    <div className="flex items-center border-t border-gray-3 py-5 px-7.5">
+    <div className="flex items-center border-t border-gray-3 py-5 px-7.5 xl:px-10 xl:py-6">
       {/* Checkbox */}
-      <div className="min-w-[50px] flex items-center justify-center">
+      <div className="min-w-[50px] xl:w-16 flex items-center justify-center">
         {mounted ? (
           <input
             type="checkbox"
@@ -89,35 +90,40 @@ const SingleItem = ({ item }) => {
         )}
       </div>
 
-      <div className="min-w-[400px]">
+      <div className="min-w-[320px] xl:flex-1 xl:min-w-0">
         <div className="flex items-center justify-between gap-5">
-          <div className="w-full flex items-center gap-5.5">
-            <div className="flex items-center justify-center rounded-[5px] bg-gray-2 max-w-[80px] w-full h-17.5">
+          <div className="w-full flex items-center gap-5.5 xl:gap-6">
+            <div className="flex items-center justify-center rounded-[5px] bg-gray-2 max-w-[80px] xl:max-w-[100px] w-full h-17.5 xl:h-20">
               <Image
                 width={200}
                 height={200}
                 src={item.imgs?.thumbnails[0]}
                 alt="product"
+                className="object-contain"
               />
             </div>
 
-            <div>
-              <h3 className="text-dark ease-out duration-200 hover:text-blue">
+            <div className="flex-1">
+              <h3 className="text-dark xl:text-base ease-out duration-200 hover:text-blue">
                 <a href="#"> {item.title} </a>
               </h3>
               {optionsText && (
-                <p className="text-custom-sm text-dark-4 mt-1">{optionsText}</p>
+                <p className="text-custom-sm xl:text-sm text-dark-4 mt-1">
+                  {optionsText}
+                </p>
               )}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="min-w-[180px]">
-        <p className="text-dark">${item.discountedPrice}</p>
+      <div className="min-w-[180px] xl:w-32 xl:min-w-0 xl:text-center">
+        <p className="text-dark xl:font-medium">
+          {formatPrice(item.discountedPrice)}
+        </p>
       </div>
 
-      <div className="min-w-[250px]">
+      <div className="min-w-[250px] xl:w-40 xl:min-w-0 xl:flex xl:justify-center">
         <div className="w-max flex items-center rounded-md border border-gray-3">
           <button
             onClick={() => handleDecreaseQuantity()}
@@ -169,15 +175,17 @@ const SingleItem = ({ item }) => {
         </div>
       </div>
 
-      <div className="min-w-[150px]">
-        <p className="text-dark">${item.discountedPrice * quantity}</p>
+      <div className="min-w-[230px] xl:w-32 xl:min-w-0 xl:text-center">
+        <p className="text-dark xl:font-medium">
+          {formatPrice(item.discountedPrice * quantity)}
+        </p>
       </div>
 
-      <div className="min-w-[125px] flex justify-start">
+      <div className="min-w-[125px] xl:w-24 xl:min-w-0 xl:flex xl:justify-center">
         <button
           onClick={() => handleRemoveFromCart()}
           aria-label="button for remove product from cart"
-          className="flex items-center justify-center rounded-lg max-w-[38px] w-full h-9.5 bg-gray-2 border border-gray-3 text-dark ease-out duration-200 hover:bg-red-light-6 hover:border-red-light-4 hover:text-red"
+          className="flex items-center justify-center rounded-lg max-w-[38px] xl:max-w-[40px] w-full h-9.5 xl:h-10 bg-gray-2 border border-gray-3 text-dark ease-out duration-200 hover:bg-red-light-6 hover:border-red-light-4 hover:text-red"
         >
           <svg
             className="fill-current"

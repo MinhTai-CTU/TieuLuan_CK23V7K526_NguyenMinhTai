@@ -1,146 +1,123 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCartStore } from "@/stores/cart-store";
+import { useAuth } from "@/hooks/useAuth";
 import Breadcrumb from "../Common/Breadcrumb";
-import Login from "./Login";
-import Shipping from "./Shipping";
-import ShippingMethod from "./ShippingMethod";
-import PaymentMethod from "./PaymentMethod";
-import Coupon from "./Coupon";
-import Billing from "./Billing";
+import OrderInformation from "./OrderInformation";
+import DeliveryAddress from "./DeliveryAddress";
+import TotalAmount from "./TotalAmount";
+import ShippingOptions from "./ShippingOptions";
 
 const Checkout = () => {
-  return (
-    <>
-      <Breadcrumb title={"Checkout"} pages={["checkout"]} />
-      <section className="overflow-hidden py-20 bg-gray-2">
-        <div className="max-w-[1170px] w-full mx-auto px-4 sm:px-8 xl:px-0">
-          <form>
-            <div className="flex flex-col lg:flex-row gap-7.5 xl:gap-11">
-              {/* <!-- checkout left --> */}
-              <div className="lg:max-w-[670px] w-full">
-                {/* <!-- login box --> */}
-                <Login />
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const cartItems = useCartStore((state) => state.items);
+  const selectedItems = useCartStore((state) => state.selectedItems);
+  const isLoading = useCartStore((state) => state.isLoading);
+  const isInitialized = useCartStore((state) => state.isInitialized);
+  const loadCart = useCartStore((state) => state.loadCart);
+  const [hasLoadedCart, setHasLoadedCart] = useState(false);
 
-                {/* <!-- billing details --> */}
-                <Billing />
+  // Load cart if authenticated and not yet initialized
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && !isInitialized && !hasLoadedCart) {
+      setHasLoadedCart(true);
+      loadCart();
+    }
+  }, [authLoading, isAuthenticated, isInitialized, hasLoadedCart, loadCart]);
 
-                {/* <!-- address box two --> */}
-                <Shipping />
+  // Redirect to cart if no items in cart or no selected items
+  // BUT: Don't redirect if we're on the success page or if payment is processing
+  useEffect(() => {
+    // Wait for cart to load if authenticated
+    if (isAuthenticated && !isInitialized) {
+      return; // Don't redirect yet, wait for cart to load
+    }
 
-                {/* <!-- others note box --> */}
-                <div className="bg-white shadow-1 rounded-[10px] p-4 sm:p-8.5 mt-7.5">
-                  <div>
-                    <label htmlFor="notes" className="block mb-2.5">
-                      Other Notes (optional)
-                    </label>
+    // Check if we're on success page (don't redirect in that case)
+    if (typeof window !== "undefined") {
+      const currentPath = window.location.pathname;
+      if (currentPath.includes("/checkout/success")) {
+        return; // Don't redirect if already on success page
+      }
+    }
 
-                    <textarea
-                      name="notes"
-                      id="notes"
-                      rows={5}
-                      placeholder="Notes about your order, e.g. speacial notes for delivery."
-                      className="rounded-md border border-gray-3 bg-gray-1 placeholder:text-dark-5 w-full p-5 outline-none duration-200 focus:border-transparent focus:shadow-input focus:ring-2 focus:ring-blue/20"
-                    ></textarea>
-                  </div>
-                </div>
-              </div>
+    // Only redirect if cart is empty AND we're not in the middle of a payment flow
+    // (Cart might be empty temporarily after order creation but before payment completion)
+    if (cartItems.length === 0 || selectedItems.length === 0) {
+      // Add a small delay to allow payment redirects to happen first
+      const timeoutId = setTimeout(() => {
+        // Double-check we're still on checkout page (not redirected to success)
+        if (typeof window !== "undefined") {
+          const currentPath = window.location.pathname;
+          if (
+            !currentPath.includes("/checkout/success") &&
+            currentPath.includes("/checkout")
+          ) {
+            router.push("/cart");
+          }
+        }
+      }, 1000); // 1 second delay to allow payment redirects
 
-              {/* // <!-- checkout right --> */}
-              <div className="max-w-[455px] w-full">
-                {/* <!-- order list box --> */}
-                <div className="bg-white shadow-1 rounded-[10px]">
-                  <div className="border-b border-gray-3 py-5 px-4 sm:px-8.5">
-                    <h3 className="font-medium text-xl text-dark">
-                      Your Order
-                    </h3>
-                  </div>
+      return () => clearTimeout(timeoutId);
+    }
+  }, [
+    cartItems.length,
+    selectedItems.length,
+    isAuthenticated,
+    isInitialized,
+    router,
+  ]);
 
-                  <div className="pt-2.5 pb-8.5 px-4 sm:px-8.5">
-                    {/* <!-- title --> */}
-                    <div className="flex items-center justify-between py-5 border-b border-gray-3">
-                      <div>
-                        <h4 className="font-medium text-dark">Product</h4>
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-dark text-right">
-                          Subtotal
-                        </h4>
-                      </div>
-                    </div>
-
-                    {/* <!-- product item --> */}
-                    <div className="flex items-center justify-between py-5 border-b border-gray-3">
-                      <div>
-                        <p className="text-dark">iPhone 14 Plus , 6/128GB</p>
-                      </div>
-                      <div>
-                        <p className="text-dark text-right">$899.00</p>
-                      </div>
-                    </div>
-
-                    {/* <!-- product item --> */}
-                    <div className="flex items-center justify-between py-5 border-b border-gray-3">
-                      <div>
-                        <p className="text-dark">Asus RT Dual Band Router</p>
-                      </div>
-                      <div>
-                        <p className="text-dark text-right">$129.00</p>
-                      </div>
-                    </div>
-
-                    {/* <!-- product item --> */}
-                    <div className="flex items-center justify-between py-5 border-b border-gray-3">
-                      <div>
-                        <p className="text-dark">Havit HV-G69 USB Gamepad</p>
-                      </div>
-                      <div>
-                        <p className="text-dark text-right">$29.00</p>
-                      </div>
-                    </div>
-
-                    {/* <!-- product item --> */}
-                    <div className="flex items-center justify-between py-5 border-b border-gray-3">
-                      <div>
-                        <p className="text-dark">Shipping Fee</p>
-                      </div>
-                      <div>
-                        <p className="text-dark text-right">$15.00</p>
-                      </div>
-                    </div>
-
-                    {/* <!-- total --> */}
-                    <div className="flex items-center justify-between pt-5">
-                      <div>
-                        <p className="font-medium text-lg text-dark">Total</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-lg text-dark text-right">
-                          $1072.00
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* <!-- coupon box --> */}
-                <Coupon />
-
-                {/* <!-- shipping box --> */}
-                <ShippingMethod />
-
-                {/* <!-- payment box --> */}
-                <PaymentMethod />
-
-                {/* <!-- checkout button --> */}
-                <button
-                  type="submit"
-                  className="w-full flex justify-center font-medium text-white bg-blue py-3 px-6 rounded-md ease-out duration-200 hover:bg-blue-dark mt-7.5"
-                >
-                  Process to Checkout
-                </button>
+  // Show loading state while cart is loading (especially after login)
+  if (isAuthenticated && (!isInitialized || isLoading)) {
+    return (
+      <>
+        <Breadcrumb title={"Thanh toán"} pages={["checkout"]} />
+        <section className="overflow-hidden py-8 bg-gray-50">
+          <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue border-t-transparent mb-4"></div>
+                <p className="text-dark-4">Đang tải giỏ hàng...</p>
               </div>
             </div>
-          </form>
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  // Don't render checkout if no items
+  if (cartItems.length === 0 || selectedItems.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      <Breadcrumb title={"Thanh toán"} pages={["checkout"]} />
+      <section className="overflow-hidden py-8 bg-gray-50">
+        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Order Information & Shipping Options */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Order Information */}
+              <OrderInformation />
+
+              {/* Shipping Options */}
+              <ShippingOptions />
+            </div>
+
+            {/* Right Column - Delivery Address & Total Amount */}
+            <div className="space-y-6">
+              {/* Delivery Address */}
+              <DeliveryAddress />
+
+              {/* Total Amount */}
+              <TotalAmount />
+            </div>
+          </div>
         </div>
       </section>
     </>

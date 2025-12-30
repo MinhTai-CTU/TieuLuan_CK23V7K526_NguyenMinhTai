@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/middleware/auth";
 import { PERMISSIONS } from "@/lib/permissions";
+import { sendUnbanNotificationEmail } from "@/lib/email";
 
 /**
  * Unban a user account
@@ -24,6 +25,25 @@ export async function PUT(
 
     const { id } = await params;
 
+    // Get user info before updating (for email)
+    const userBeforeUpdate = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        email: true,
+        name: true,
+      },
+    });
+
+    if (!userBeforeUpdate) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "User not found",
+        },
+        { status: 404 }
+      );
+    }
+
     // Update user to active
     const user = await prisma.user.update({
       where: { id },
@@ -41,6 +61,15 @@ export async function PUT(
         bannedReason: true,
       },
     });
+
+    // Send notification email
+    try {
+      await sendUnbanNotificationEmail(user.email, user.name);
+      console.log(`✅ Unban notification email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error("❌ Failed to send unban notification email:", emailError);
+      // Don't fail the request if email fails, just log the error
+    }
 
     return NextResponse.json({
       success: true,

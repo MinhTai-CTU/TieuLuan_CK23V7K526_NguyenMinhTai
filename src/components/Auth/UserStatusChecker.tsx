@@ -31,7 +31,7 @@ export default function UserStatusChecker() {
     if (error === "banned") {
       clearAuth();
       logout();
-      toast.error("Your account has been banned. Please contact support.", {
+      toast.error("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hỗ trợ.", {
         duration: 5000,
         id: "user-banned", // Use id to prevent duplicates
       });
@@ -78,15 +78,18 @@ export default function UserStatusChecker() {
           // Show appropriate error message
           if (data.isBanned) {
             toast.error(
-              `Your account has been banned. ${data.bannedReason ? `Reason: ${data.bannedReason}` : ""}`,
+              `Tài khoản của bạn đã bị khóa. ${data.bannedReason ? `Lý do: ${data.bannedReason}` : ""}`,
               { duration: 5000 }
             );
           } else if (data.requiresVerification) {
-            toast.error("Please verify your email before accessing the site.", {
-              duration: 5000,
-            });
+            toast.error(
+              "Vui lòng xác minh email trước khi truy cập trang web.",
+              {
+                duration: 5000,
+              }
+            );
           } else {
-            toast.error("Your session has expired. Please login again.", {
+            toast.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", {
               duration: 3000,
             });
           }

@@ -23,7 +23,12 @@ export function saveToken(token: string): void {
   if (typeof window !== "undefined") {
     localStorage.setItem(AUTH_TOKEN_KEY, token);
     // Also save to cookie for server-side access
-    document.cookie = `auth_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+    // Use secure cookie in production, but allow http in development
+    const isProduction = process.env.NODE_ENV === "production";
+    const cookieOptions = isProduction
+      ? `path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`
+      : `path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+    document.cookie = `auth_token=${token}; ${cookieOptions}`;
   }
 }
 

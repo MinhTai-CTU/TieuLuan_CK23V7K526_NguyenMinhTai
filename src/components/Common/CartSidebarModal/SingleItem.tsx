@@ -2,6 +2,7 @@ import React from "react";
 import { useCartStore } from "@/stores/cart-store";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { formatPrice } from "@/utils/formatPrice";
 
 const SingleItem = ({ item }) => {
   const removeItemFromCart = useCartStore((state) => state.removeItemFromCart);
@@ -17,12 +18,12 @@ const SingleItem = ({ item }) => {
   const handleRemoveFromCart = async () => {
     try {
       await removeItemFromCart(item.cartItemId);
-      toast.success(`${item.title} has been removed from the cart`, {
+      toast.success(`${item.title} đã được xóa khỏi giỏ hàng`, {
         duration: 3000,
         icon: "🗑️",
       });
     } catch (error) {
-      toast.error("Cannot remove product. Please try again.");
+      toast.error("Không thể xóa sản phẩm. Vui lòng thử lại.");
     }
   };
 
@@ -77,9 +78,11 @@ const SingleItem = ({ item }) => {
           {optionsText && (
             <p className="text-custom-sm text-dark-4 mb-1">{optionsText}</p>
           )}
-          <p className="text-custom-sm">Price: ${item.discountedPrice}</p>
+          <p className="text-custom-sm">
+            Giá: {formatPrice(item.discountedPrice)}
+          </p>
           <p className="text-custom-sm font-medium mt-1">
-            Subtotal: ${(item.discountedPrice * quantity).toFixed(2)}
+            Tạm tính: {formatPrice(item.discountedPrice * quantity)}
           </p>
         </div>
       </div>

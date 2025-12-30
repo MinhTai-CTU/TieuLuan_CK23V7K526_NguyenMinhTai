@@ -8,7 +8,6 @@ import SingleListItem from "../Shop/SingleListItem";
 import CustomSelect from "../ShopWithSidebar/CustomSelect";
 import ProductItem from "../Common/ProductItem";
 
-import shopData from "../Shop/shopData";
 import { useProducts } from "@/hooks/queries/useProducts";
 import { useCategories } from "@/hooks/queries/useCategories";
 
@@ -17,15 +16,21 @@ const ShopWithoutSidebar = () => {
   const categoryId = searchParams.get("categoryId");
   const searchQuery = searchParams.get("search");
   const [productStyle, setProductStyle] = useState("grid");
+  const [sortOption, setSortOption] = useState<string>("0"); // default newest
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 8;
 
   // Fetch products with category and search filters
   const {
-    data: products,
+    data: productsData,
     isLoading,
     isError,
   } = useProducts({
     categoryId: categoryId || undefined,
     search: searchQuery || undefined,
+    sort: sortOption === "1" ? "bestseller" : sortOption === "2" ? "oldest" : "newest",
+    limit: itemsPerPage,
+    offset: (currentPage - 1) * itemsPerPage,
   });
 
   // Fetch categories to get category name
@@ -35,18 +40,18 @@ const ShopWithoutSidebar = () => {
     return categories.find((cat) => cat.id === categoryId);
   }, [categoryId, categories]);
 
-  // Use API products if available, otherwise fallback to static data
+  // Use API products
   const displayProducts = useMemo(() => {
-    if (products && products.length > 0) {
-      return products;
-    }
-    return shopData;
-  }, [products]);
+    return productsData?.products || [];
+  }, [productsData]);
+
+  const totalProducts = productsData?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(totalProducts / itemsPerPage));
 
   const options = [
-    { label: "Latest Products", value: "0" },
-    { label: "Best Selling", value: "1" },
-    { label: "Old Products", value: "2" },
+    { label: "Sản phẩm mới nhất", value: "0" },
+    { label: "Bán chạy nhất", value: "1" },
+    { label: "Sản phẩm cũ", value: "2" },
   ];
 
   return (
@@ -54,17 +59,17 @@ const ShopWithoutSidebar = () => {
       <Breadcrumb
         title={
           searchQuery
-            ? `Search Results${selectedCategory ? ` in ${selectedCategory.title}` : ""}`
+            ? `Kết quả tìm kiếm${selectedCategory ? ` trong ${selectedCategory.title}` : ""}`
             : selectedCategory
-              ? `${selectedCategory.title} Products`
-              : "Explore All Products"
+              ? `Sản phẩm ${selectedCategory.title}`
+              : "Tất cả sản phẩm"
         }
         pages={
           searchQuery
-            ? ["shop", "/", "search"]
+            ? ["shop", "tìm kiếm"]
             : selectedCategory
-              ? ["shop", "/", selectedCategory.title.toLowerCase()]
-              : ["shop", "/", "shop without sidebar"]
+              ? ["shop", selectedCategory.title]
+              : ["shop", "shop without sidebar"]
         }
       />
       <section className="overflow-hidden relative pb-20 pt-5 lg:pt-20 xl:pt-28 bg-[#f3f4f6]">
@@ -76,22 +81,22 @@ const ShopWithoutSidebar = () => {
                 <div className="flex items-center justify-between">
                   {/* <!-- top bar left --> */}
                   <div className="flex flex-wrap items-center gap-4">
-                    <CustomSelect options={options} />
+                    <CustomSelect options={options} initialValue={sortOption} onChange={(val)=>{setSortOption(val); setCurrentPage(1);}} />
 
                     <p>
-                      Showing{" "}
+                      Hiển thị{" "}
                       <span className="text-dark">
-                        {displayProducts.length} of {displayProducts.length}
+                        {displayProducts.length} trong {totalProducts}
                       </span>{" "}
-                      Products
+                      sản phẩm (trang {currentPage}/{totalPages})
                       {searchQuery && (
                         <span className="text-gray-500 ml-2">
-                          for &quot;{searchQuery}&quot;
+                          cho &quot;{searchQuery}&quot;
                         </span>
                       )}
                       {selectedCategory && (
                         <span className="text-gray-500 ml-2">
-                          in {selectedCategory.title}
+                          trong {selectedCategory.title}
                         </span>
                       )}
                     </p>
@@ -214,29 +219,31 @@ const ShopWithoutSidebar = () => {
                 <div className="text-center py-20">
                   <p className="text-gray-500 text-lg">
                     {selectedCategory
-                      ? `No products found in ${selectedCategory.title} category.`
-                      : "No products found."}
+                      ? `Không tìm thấy sản phẩm nào trong danh mục ${selectedCategory.title}.`
+                      : "Không tìm thấy sản phẩm nào."}
                   </p>
                 </div>
               )}
               {isError && (
                 <p className="text-sm text-red-500 mt-4">
-                  Unable to load products. Showing demo data instead.
+                  Không thể tải sản phẩm. Vui lòng thử lại sau.
                 </p>
               )}
               {/* <!-- Products Grid Tab Content End --> */}
 
               {/* <!-- Products Pagination Start --> */}
+              {totalPages > 1 && (
               <div className="flex justify-center mt-15">
                 <div className="bg-white shadow-1 rounded-md p-2">
                   <ul className="flex items-center">
+                    {/* Prev */}
                     <li>
                       <button
-                        id="paginationLeft"
-                        aria-label="button for pagination left"
+                        aria-label="previous page"
                         type="button"
-                        disabled
-                        className="flex items-center justify-center w-8 h-9 ease-out duration-200 rounded-[3px disabled:text-gray-4"
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        className="flex items-center justify-center w-8 h-9 rounded-[3px] hover:text-white hover:bg-blue disabled:text-gray-4"
                       >
                         <svg
                           className="fill-current"
@@ -322,6 +329,7 @@ const ShopWithoutSidebar = () => {
                         id="paginationLeft"
                         aria-label="button for pagination left"
                         type="button"
+                        disabled={currentPage === totalPages}
                         className="flex items-center justify-center w-8 h-9 ease-out duration-200 rounded-[3px] hover:text-white hover:bg-blue disabled:text-gray-4"
                       >
                         <svg
@@ -342,7 +350,7 @@ const ShopWithoutSidebar = () => {
                   </ul>
                 </div>
               </div>
-              {/* <!-- Products Pagination End --> */}
+              )}
             </div>
             {/* // <!-- Content End --> */}
           </div>

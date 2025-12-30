@@ -49,8 +49,12 @@ type ProductsResponse = {
 
 type UseProductsOptions = {
   limit?: number;
+  offset?: number;
   categoryId?: string;
   search?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sort?: string; // e.g. "newest", "bestseller", "oldest"
 };
 
 const mapImages = (images: ProductImageResponse[]): ProductImages => {
@@ -78,13 +82,21 @@ const mapImages = (images: ProductImageResponse[]): ProductImages => {
 
 const fetchProducts = async ({
   limit,
+  offset,
   categoryId,
   search,
-}: UseProductsOptions): Promise<Product[]> => {
+  minPrice,
+  maxPrice,
+  sort,
+}: UseProductsOptions): Promise<{ products: Product[]; total: number }> => {
   const params = new URLSearchParams();
   if (limit) params.append("limit", limit.toString());
+  if (offset !== undefined) params.append("offset", offset.toString());
   if (categoryId) params.append("categoryId", categoryId);
   if (search) params.append("search", search);
+  if (minPrice !== undefined) params.append("minPrice", minPrice.toString());
+  if (maxPrice !== undefined) params.append("maxPrice", maxPrice.toString());
+  if (sort) params.append("sort", sort);
 
   const queryString = params.toString();
   const response = await fetch(
@@ -103,31 +115,34 @@ const fetchProducts = async ({
     throw new Error("Products response returned unsuccessful flag");
   }
 
-  return json.data.map((product) => ({
-    id: product.id,
-    title: product.title,
-    slug: product.slug,
-    description: product.description,
-    reviews: product.reviews ?? 0,
-    price: product.price,
-    discountedPrice: product.discountedPrice ?? product.price,
-    stock: product.stock,
-    hasVariants: product.hasVariants ?? false,
-    categoryId: product.categoryId,
-    attributes: product.attributes as ProductAttributes | null,
-    additionalInfo: product.additionalInfo as ProductAdditionalInfo | null,
-    imgs: mapImages(product.images ?? []),
-    variants: product.variants?.map((v) => ({
-      id: v.id,
-      productId: v.productId,
-      price: v.price,
-      discountedPrice: v.discountedPrice,
-      stock: v.stock,
-      sku: v.sku,
-      options: v.options,
-      image: v.image,
+  return {
+    products: json.data.map((product) => ({
+      id: product.id,
+      title: product.title,
+      slug: product.slug,
+      description: product.description,
+      reviews: product.reviews ?? 0,
+      price: product.price,
+      discountedPrice: product.discountedPrice ?? product.price,
+      stock: product.stock,
+      hasVariants: product.hasVariants ?? false,
+      categoryId: product.categoryId,
+      attributes: product.attributes as ProductAttributes | null,
+      additionalInfo: product.additionalInfo as ProductAdditionalInfo | null,
+      imgs: mapImages(product.images ?? []),
+      variants: product.variants?.map((v) => ({
+        id: v.id,
+        productId: v.productId,
+        price: v.price,
+        discountedPrice: v.discountedPrice,
+        stock: v.stock,
+        sku: v.sku,
+        options: v.options,
+        image: v.image,
+      })),
     })),
-  }));
+    total: json.total,
+  };
 };
 
 export const useProducts = (options: UseProductsOptions = {}) => {

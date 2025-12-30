@@ -32,7 +32,12 @@ const OrderModal = ({ showDetails, showEdit, toggleModal, order }: any) => {
           </button>
 
           <>
-            {showDetails && <OrderDetails orderItem={order} />}
+            {showDetails && (
+              <OrderDetails
+                orderItem={order}
+                onClose={() => toggleModal(false)}
+              />
+            )}
 
             {showEdit && <EditOrder order={order} toggleModal={toggleModal} />}
           </>

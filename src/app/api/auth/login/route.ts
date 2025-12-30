@@ -93,8 +93,8 @@ export async function POST(request: NextRequest) {
     // Generate JWT token
     const token = generateToken(user.id, user.email);
 
-    // Return user data and token
-    return NextResponse.json({
+    // Create response with user data and token
+    const response = NextResponse.json({
       success: true,
       data: {
         user: {
@@ -109,6 +109,21 @@ export async function POST(request: NextRequest) {
         token,
       },
     });
+
+    // Set cookie for server-side access
+    const isProduction = process.env.NODE_ENV === "production";
+    const cookieOptions = isProduction
+      ? `Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`
+      : `Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+    
+    response.cookies.set("auth_token", token, {
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      sameSite: "lax",
+      secure: isProduction,
+    });
+
+    return response;
   } catch (error: any) {
     console.error("Error logging in:", error);
     return NextResponse.json(

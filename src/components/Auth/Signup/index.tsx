@@ -1,79 +1,36 @@
 "use client";
 import Breadcrumb from "@/components/Common/Breadcrumb";
 import Link from "next/link";
-import React, { useState, FormEvent } from "react";
+import React, { useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { signIn as signUpWithProvider } from "next-auth/react";
+import {
+  signupSchema,
+  type SignupFormData,
+} from "@/utils/validation/authRules";
 
 const Signup = () => {
   const router = useRouter();
-  const [formData, setFormData] = useState({
+  const [isLoading, setIsLoading] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SignupFormData>({
+    resolver: yupResolver(signupSchema) as any,
+    defaultValues: {
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
+    },
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{
-    name?: string;
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-  }>({});
 
-  const validateForm = () => {
-    const newErrors: {
-      name?: string;
-      email?: string;
-      password?: string;
-      confirmPassword?: string;
-    } = {};
-
-    if (!formData.name || formData.name.trim().length < 2) {
-      newErrors.name = "Name must be at least 2 characters";
-    }
-
-    if (!formData.email) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email";
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
-
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your password";
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-
-    // Clear error when user starts typing
-    if (errors[name as keyof typeof errors]) {
-      setErrors({ ...errors, [name]: undefined });
-    }
-  };
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      toast.error("Please fix the errors in the form");
-      return;
-    }
-
+  const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true);
 
     try {
@@ -83,23 +40,22 @@ const Signup = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          name: formData.name,
+          email: data.email,
+          password: data.password,
+          name: data.name,
         }),
       });
 
-      const data = await response.json();
+      const result = await response.json();
 
-      if (!response.ok || !data.success) {
-        // Handle error without throwing
-        toast.error(data.error || "Registration failed. Please try again.");
-        return; // Stop execution
+      if (!response.ok || !result.success) {
+        toast.error(result.error || "Đăng ký thất bại. Vui lòng thử lại.");
+        return;
       }
 
       toast.success(
-        data.message ||
-          "Account created successfully! Please check your email to verify your account."
+        result.message ||
+          "Tạo tài khoản thành công! Vui lòng kiểm tra email để xác minh tài khoản."
       );
 
       // Redirect to signin page after showing message
@@ -108,9 +64,7 @@ const Signup = () => {
       }, 3000);
     } catch (error: any) {
       console.error("Registration error:", error);
-      // Only show toast for network errors or unexpected errors
-      // API errors are already handled above
-      toast.error("An unexpected error occurred. Please try again.");
+      toast.error("Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.");
     } finally {
       setIsLoading(false);
     }
@@ -215,7 +169,7 @@ const Signup = () => {
             </span>
 
             <div className="mt-5.5">
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit(onSubmit)}>
                 <div className="mb-5">
                   <label htmlFor="name" className="block mb-2.5">
                     Full Name <span className="text-red">*</span>
@@ -223,10 +177,8 @@ const Signup = () => {
 
                   <input
                     type="text"
-                    name="name"
                     id="name"
-                    value={formData.name}
-                    onChange={handleChange}
+                    {...register("name")}
                     placeholder="Enter your full name"
                     className={`rounded-lg border ${
                       errors.name ? "border-red" : "border-gray-3"
@@ -234,7 +186,9 @@ const Signup = () => {
                     disabled={isLoading}
                   />
                   {errors.name && (
-                    <p className="text-red text-sm mt-1">{errors.name}</p>
+                    <p className="text-red text-sm mt-1">
+                      {errors.name.message}
+                    </p>
                   )}
                 </div>
 
@@ -245,10 +199,8 @@ const Signup = () => {
 
                   <input
                     type="email"
-                    name="email"
                     id="email"
-                    value={formData.email}
-                    onChange={handleChange}
+                    {...register("email")}
                     placeholder="Enter your email address"
                     className={`rounded-lg border ${
                       errors.email ? "border-red" : "border-gray-3"
@@ -256,7 +208,9 @@ const Signup = () => {
                     disabled={isLoading}
                   />
                   {errors.email && (
-                    <p className="text-red text-sm mt-1">{errors.email}</p>
+                    <p className="text-red text-sm mt-1">
+                      {errors.email.message}
+                    </p>
                   )}
                 </div>
 
@@ -267,10 +221,8 @@ const Signup = () => {
 
                   <input
                     type="password"
-                    name="password"
                     id="password"
-                    value={formData.password}
-                    onChange={handleChange}
+                    {...register("password")}
                     placeholder="Enter your password"
                     autoComplete="on"
                     className={`rounded-lg border ${
@@ -279,7 +231,9 @@ const Signup = () => {
                     disabled={isLoading}
                   />
                   {errors.password && (
-                    <p className="text-red text-sm mt-1">{errors.password}</p>
+                    <p className="text-red text-sm mt-1">
+                      {errors.password.message}
+                    </p>
                   )}
                 </div>
 
@@ -290,10 +244,8 @@ const Signup = () => {
 
                   <input
                     type="password"
-                    name="confirmPassword"
                     id="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
+                    {...register("confirmPassword")}
                     placeholder="Re-type your password"
                     autoComplete="on"
                     className={`rounded-lg border ${
@@ -303,7 +255,7 @@ const Signup = () => {
                   />
                   {errors.confirmPassword && (
                     <p className="text-red text-sm mt-1">
-                      {errors.confirmPassword}
+                      {errors.confirmPassword.message}
                     </p>
                   )}
                 </div>

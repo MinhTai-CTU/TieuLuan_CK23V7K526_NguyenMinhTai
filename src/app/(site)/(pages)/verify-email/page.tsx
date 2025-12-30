@@ -38,7 +38,7 @@ export default function VerifyEmailPage() {
         if (data.success) {
           setStatus("success");
           setMessage(data.message || "Email verified successfully!");
-          toast.success("Email verified successfully!");
+          toast.success("Xác minh email thành công!");
 
           // Redirect to signin after 3 seconds
           setTimeout(() => {
@@ -48,7 +48,7 @@ export default function VerifyEmailPage() {
           // Only show error if success is explicitly false
           setStatus("error");
           setMessage(data.error || "Failed to verify email");
-          toast.error(data.error || "Failed to verify email");
+          toast.error(data.error || "Xác minh email thất bại");
           // Reset flag on error so user can retry
           hasVerified.current = false;
         }
@@ -60,7 +60,7 @@ export default function VerifyEmailPage() {
           error.message || "An error occurred while verifying your email"
         );
         toast.error(
-          error.message || "An error occurred while verifying your email"
+          error.message || "Đã xảy ra lỗi khi xác minh email của bạn"
         );
         // Reset flag on error so user can retry
         hasVerified.current = false;

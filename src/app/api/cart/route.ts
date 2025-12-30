@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
 
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
         product: {
           include: {
             images: true,
+            variants: true, // Include all variants for fallback logic
           },
         },
         productVariant: true,
@@ -39,11 +41,94 @@ export async function GET(request: NextRequest) {
     const items = cartItems.map((item) => {
       const product = item.product;
       const variant = item.productVariant;
+      const selectedOptions =
+        (item.selectedOptions as Record<string, any>) || {};
 
-      // Use variant price if available, otherwise product price
-      const price = variant?.price ?? product.price;
-      const discountedPrice =
-        variant?.discountedPrice ?? product.discountedPrice;
+      // Start with base price from variant or product
+      let basePrice = variant?.price ?? product.price;
+      let baseDiscountedPrice =
+        variant?.discountedPrice ?? product.discountedPrice ?? basePrice;
+
+      // Fallback: If product has variants but variant is null and price is 0,
+      // try to find matching variant from product.variants (already loaded)
+      if (product.hasVariants && !variant && basePrice === 0 && product.variants) {
+        // Try to find matching variant by selectedOptions
+        const matchingVariant = product.variants.find((v: any) => {
+          const variantOptions = (v.options as any) || {};
+          const selectedOpts = selectedOptions || {};
+
+          // Match by comparing options
+          const variantKeys = Object.keys(variantOptions).sort();
+          const selectedKeys = Object.keys(selectedOpts).sort();
+
+          if (variantKeys.length !== selectedKeys.length) return false;
+
+          return variantKeys.every((key) => {
+            const variantValue = String(variantOptions[key] || "").trim();
+            const selectedValue = String(selectedOpts[key] || "").trim();
+            return variantValue === selectedValue;
+          });
+        });
+
+        if (matchingVariant) {
+          basePrice = matchingVariant.price;
+          baseDiscountedPrice =
+            matchingVariant.discountedPrice ?? matchingVariant.price;
+        } else if (product.variants.length > 0) {
+          // If no exact match, use first variant as fallback
+          basePrice = product.variants[0].price;
+          baseDiscountedPrice =
+            product.variants[0].discountedPrice ?? product.variants[0].price;
+        }
+      }
+
+      // Calculate additional price from selected options (storage, type, sim)
+      // Note: Color is usually part of variant, so we don't add color price separately
+      let additionalPrice = 0;
+
+      // Get product attributes to find option prices
+      const attributes = (product.attributes as any) || {};
+      const storages = attributes.storage || [];
+      const types = attributes.type || [];
+      const sims = attributes.sim || [];
+
+      // Add storage price if selected
+      if (selectedOptions.storage) {
+        const storageOption = storages.find(
+          (s: any) =>
+            s.id === selectedOptions.storage ||
+            s.title === selectedOptions.storage
+        );
+        if (storageOption?.price) {
+          additionalPrice += storageOption.price;
+        }
+      }
+
+      // Add type price if selected
+      if (selectedOptions.type) {
+        const typeOption = types.find(
+          (t: any) =>
+            t.id === selectedOptions.type || t.title === selectedOptions.type
+        );
+        if (typeOption?.price) {
+          additionalPrice += typeOption.price;
+        }
+      }
+
+      // Add sim price if selected
+      if (selectedOptions.sim) {
+        const simOption = sims.find(
+          (s: any) =>
+            s.id === selectedOptions.sim || s.title === selectedOptions.sim
+        );
+        if (simOption?.price) {
+          additionalPrice += simOption.price;
+        }
+      }
+
+      // Final price = base price + additional options price
+      const finalPrice = basePrice + additionalPrice;
+      const finalDiscountedPrice = baseDiscountedPrice + additionalPrice;
 
       // Map images
       const images = product.images || [];
@@ -59,10 +144,10 @@ export async function GET(request: NextRequest) {
         productId: product.id,
         productVariantId: variant?.id || null,
         title: product.title,
-        price,
-        discountedPrice: discountedPrice ?? price,
+        price: finalPrice,
+        discountedPrice: finalDiscountedPrice,
         quantity: item.quantity,
-        selectedOptions: item.selectedOptions as Record<string, any> | null,
+        selectedOptions: selectedOptions,
         imgs: {
           thumbnails: thumbnails.length > 0 ? thumbnails : previews,
           previews: previews.length > 0 ? previews : thumbnails,
@@ -114,13 +199,39 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if item already exists
-    // Use findFirst instead of findUnique because productVariantId can be null
-    const existingItem = await prisma.cartItem.findFirst({
+    // IMPORTANT: Compare by productId + productVariantId + selectedOptions
+    // This ensures different options create different cart items
+    // Fetch all cart items for this product to compare selectedOptions manually
+    const allCartItems = await prisma.cartItem.findMany({
       where: {
         userId: decoded.userId,
         productId,
         productVariantId: productVariantId || null,
       },
+    });
+
+    // Normalize selectedOptions for comparison
+    const normalizeOptions = (opts: any): string => {
+      if (!opts || typeof opts !== "object") return "";
+      return JSON.stringify(
+        Object.entries(opts)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .reduce(
+            (acc, [key, value]) => {
+              acc[key] = String(value || "").trim();
+              return acc;
+            },
+            {} as Record<string, string>
+          )
+      );
+    };
+
+    const normalizedNewOptions = normalizeOptions(selectedOptions);
+
+    // Find exact match: same productId, same variantId, AND same selectedOptions
+    const existingItem = allCartItems.find((item) => {
+      const normalizedItemOptions = normalizeOptions(item.selectedOptions);
+      return normalizedItemOptions === normalizedNewOptions;
     });
 
     if (existingItem) {

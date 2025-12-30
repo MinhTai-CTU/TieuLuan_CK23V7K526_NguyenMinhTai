@@ -13,20 +13,44 @@ export type CartItemOptions = {
   [key: string]: string | undefined; // Allow any additional options
 };
 
-// Helper function to generate unique cart item ID from product ID + options
+// Helper function to generate unique cart item ID from product ID + variant ID + options
+// Logic:
+// - Always include ALL options in cartItemId to ensure different options = different cart items
+// - If product has variant: use productId + variantId + options (if any)
+// - If product has options but no variant: use productId + options
+// - If product has no options/variant: use productId only
 export const generateCartItemId = (
   productId: string,
-  options?: CartItemOptions
+  options?: CartItemOptions,
+  variantId?: string | null
 ): string => {
-  if (!options || Object.keys(options).length === 0) {
-    return productId;
+  // Build options string from all options (sorted for consistency)
+  let optionsString = "";
+  if (options && Object.keys(options).length > 0) {
+    optionsString = Object.entries(options)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}:${String(value || "").trim()}`)
+      .filter((item) => item.split(":")[1] !== "") // Remove empty values
+      .join("|");
   }
-  // Create a hash from options
-  const optionsString = Object.entries(options)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}:${value || ""}`)
-    .join("|");
-  return `${productId}_${optionsString}`;
+
+  // If product has variant, include variantId AND options
+  // This ensures: same variant + same options = same cart item (increase quantity)
+  // Different variant OR different options = different cart item (create new)
+  if (variantId) {
+    if (optionsString) {
+      return `${productId}_variant_${variantId}_${optionsString}`;
+    }
+    return `${productId}_variant_${variantId}`;
+  }
+
+  // If product has options but no variant, use productId + options
+  if (optionsString) {
+    return `${productId}_${optionsString}`;
+  }
+
+  // If product has no options/variant, use productId only
+  return productId;
 };
 
 // Guest cart item (stored separately for merge) - only essential data
@@ -73,6 +97,7 @@ type CartState = {
   loadCart: () => Promise<void>;
   mergeGuestCart: () => Promise<void>;
   setCart: (items: CartItem[]) => void; // Helper to set cart items (used by persist)
+  clearCart: () => void; // Clear all cart state (used when user logs out)
 };
 
 // Check if user is authenticated
@@ -163,7 +188,8 @@ const enrichGuestCartItems = async (
 
     const cartItemId = generateCartItemId(
       guestItem.productId,
-      guestItem.selectedOptions
+      guestItem.selectedOptions,
+      guestItem.productVariantId || null
     );
 
     enrichedItems.push({
@@ -226,7 +252,8 @@ export const useCartStore = create<CartState>()(
                   id: item.productId,
                   cartItemId: generateCartItemId(
                     item.productId,
-                    item.selectedOptions
+                    item.selectedOptions,
+                    item.productVariantId || null
                   ),
                   databaseId: item.id, // Database cart item ID
                   title: item.title,
@@ -238,11 +265,67 @@ export const useCartStore = create<CartState>()(
                   selectedOptions: item.selectedOptions,
                 }));
                 // setCart will trigger persist to save to localStorage (cache)
-                // Preserve selectedItems when loading from database
+                // Map selectedItems to new cartItemIds when loading from database
+                // This ensures selectedItems match with new items after merge/login
                 const currentSelectedItems = get().selectedItems;
+                const currentItems = get().items;
+
+                // Create mapping: old cartItemId -> productId + selectedOptions + productVariantId
+                const oldSelectedItemsMap = new Map<
+                  string,
+                  {
+                    productId: string;
+                    selectedOptions?: CartItemOptions;
+                    productVariantId?: string | null;
+                  }
+                >();
+                currentItems.forEach((item) => {
+                  if (currentSelectedItems.includes(item.cartItemId)) {
+                    oldSelectedItemsMap.set(item.cartItemId, {
+                      productId: item.id,
+                      selectedOptions: item.selectedOptions,
+                      productVariantId: item.productVariantId || null,
+                    });
+                  }
+                });
+
+                // Map to new cartItemIds
+                const newSelectedItems: string[] = [];
+                oldSelectedItemsMap.forEach((itemData) => {
+                  const matchingItem = items.find((newItem) => {
+                    // Match by productId and productVariantId
+                    if (newItem.id !== itemData.productId) return false;
+                    if (newItem.productVariantId !== itemData.productVariantId)
+                      return false;
+
+                    // Match by selectedOptions (deep comparison)
+                    const oldOptions = itemData.selectedOptions || {};
+                    const newOptions = newItem.selectedOptions || {};
+
+                    const oldKeys = Object.keys(oldOptions).sort();
+                    const newKeys = Object.keys(newOptions).sort();
+
+                    if (oldKeys.length !== newKeys.length) return false;
+
+                    return oldKeys.every((key) => {
+                      return (
+                        String(oldOptions[key] || "").trim() ===
+                        String(newOptions[key] || "").trim()
+                      );
+                    });
+                  });
+
+                  if (matchingItem) {
+                    newSelectedItems.push(matchingItem.cartItemId);
+                  }
+                });
+
                 set({
                   items,
-                  selectedItems: currentSelectedItems,
+                  selectedItems:
+                    newSelectedItems.length > 0
+                      ? newSelectedItems
+                      : currentSelectedItems, // Use mapped items, fallback to current if no matches
                   isInitialized: true,
                 });
               }
@@ -326,6 +409,7 @@ export const useCartStore = create<CartState>()(
             // Clear guest cart metadata
             clearGuestCart();
             // Reload cart from database (will also update persist cache)
+            // loadCart() will automatically map selectedItems to new cartItemIds
             await get().loadCart();
           }
         } catch (error) {
@@ -595,6 +679,23 @@ export const useCartStore = create<CartState>()(
         if (items.length === 0) return false;
         return items.every((item) => selectedItems.includes(item.cartItemId));
       },
+
+      // Clear all cart state (used when user logs out)
+      clearCart: () => {
+        // Clear items, selectedItems, and reset initialization state
+        set({
+          items: [],
+          selectedItems: [],
+          isInitialized: false,
+        });
+        // Also clear guest cart metadata
+        clearGuestCart();
+        // Clear localStorage cache (persist will handle this, but we can also manually clear)
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(CART_STORAGE_KEY);
+          localStorage.removeItem(GUEST_CART_STORAGE_KEY);
+        }
+      },
     }),
     {
       name: CART_STORAGE_KEY, // localStorage key
@@ -621,3 +722,14 @@ export const useCartStore = create<CartState>()(
     }
   )
 );
+
+// Listen for logout event to clear cart
+if (typeof window !== "undefined") {
+  window.addEventListener("auth-storage-changed", () => {
+    // Check if user is logged out (no token)
+    if (!isAuthenticated()) {
+      // Clear cart state when user logs out
+      useCartStore.getState().clearCart();
+    }
+  });
+}

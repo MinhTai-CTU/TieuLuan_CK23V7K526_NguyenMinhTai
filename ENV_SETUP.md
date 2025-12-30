@@ -33,6 +33,9 @@ GOOGLE_CLIENT_SECRET="your-google-client-secret"
 # Facebook OAuth
 FACEBOOK_CLIENT_ID="your-facebook-app-id"
 FACEBOOK_CLIENT_SECRET="your-facebook-app-secret"
+
+# GOSHIP API (Shipping Service)
+GOSHIP_TOKEN="your-goship-api-token"
 ```
 
 ## OAuth Setup

@@ -93,7 +93,11 @@ export async function POST(request: NextRequest) {
     await writeFile(filepath, new Uint8Array(buffer));
 
     // Generate public URL
-    const avatarUrl = `/uploads/avatars/${filename}`;
+    // In production, use API route to serve images
+    const avatarUrl =
+      process.env.NODE_ENV === "production"
+        ? `/api/uploads/avatars/${filename}`
+        : `/uploads/avatars/${filename}`;
 
     // Update user avatar in database
     await prisma.user.update({

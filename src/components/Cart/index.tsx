@@ -1,6 +1,5 @@
 "use client";
 import React, { useState } from "react";
-import Discount from "./Discount";
 import OrderSummary from "./OrderSummary";
 import { useCartStore } from "@/stores/cart-store";
 import SingleItem from "./SingleItem";
@@ -40,13 +39,13 @@ const Cart = () => {
     setIsClearing(true);
     try {
       await removeAllItemsFromCart();
-      toast.success("Shopping cart has been cleared", {
+      toast.success("Đã xóa toàn bộ giỏ hàng", {
         duration: 3000,
         icon: "🗑️",
       });
       setIsDialogOpen(false);
     } catch (error) {
-      toast.error("Failed to clear cart. Please try again.");
+      toast.error("Không thể xóa giỏ hàng. Vui lòng thử lại.");
     } finally {
       setIsClearing(false);
     }
@@ -56,20 +55,20 @@ const Cart = () => {
     <>
       {/* <!-- ===== Breadcrumb Section Start ===== --> */}
       <section>
-        <Breadcrumb title={"Cart"} pages={["Cart"]} />
+        <Breadcrumb title={"Giỏ hàng"} pages={["cart"]} />
       </section>
       {/* <!-- ===== Breadcrumb Section End ===== --> */}
       {cartItems.length > 0 ? (
         <section className="overflow-hidden py-20 bg-gray-2">
           <div className="max-w-[1170px] w-full mx-auto px-4 sm:px-8 xl:px-0">
             <div className="flex flex-wrap items-center justify-between gap-5 mb-7.5">
-              <h2 className="font-medium text-dark text-2xl">Your Cart</h2>
+              <h2 className="font-medium text-dark text-2xl">Giỏ hàng</h2>
               <button
                 onClick={() => setIsDialogOpen(true)}
                 disabled={cartItems.length === 0}
                 className="text-blue hover:text-blue-dark disabled:opacity-50 disabled:cursor-not-allowed ease-out duration-200"
               >
-                Clear Shopping Cart
+                Xóa giỏ hàng
               </button>
 
               <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -96,11 +95,11 @@ const Cart = () => {
 
             <div className="bg-white rounded-[10px] shadow-1">
               <div className="w-full overflow-x-auto xl:overflow-x-hidden">
-                <div className="min-w-[1170px]">
+                <div className="min-w-[1170px] xl:min-w-0">
                   {/* <!-- table header --> */}
-                  <div className="flex items-center py-5.5 px-7.5">
+                  <div className="flex items-center py-5.5 px-7.5 xl:px-10">
                     {/* Select All Checkbox */}
-                    <div className="min-w-[50px] flex items-center justify-center">
+                    <div className="min-w-[50px] xl:w-16 flex items-center justify-center">
                       <input
                         type="checkbox"
                         checked={isAllSelected}
@@ -115,24 +114,24 @@ const Cart = () => {
                       />
                     </div>
 
-                    <div className="min-w-[400px]">
-                      <p className="text-dark">Product</p>
+                    <div className="min-w-[320px] xl:flex-1 xl:min-w-0">
+                      <p className="text-dark font-medium">Sản phẩm</p>
                     </div>
 
-                    <div className="min-w-[180px]">
-                      <p className="text-dark">Price</p>
+                    <div className="min-w-[180px] xl:w-32 xl:min-w-0 xl:text-center">
+                      <p className="text-dark font-medium">Giá</p>
                     </div>
 
-                    <div className="min-w-[250px]">
-                      <p className="text-dark">Quantity</p>
+                    <div className="min-w-[250px] xl:w-40 xl:min-w-0 xl:text-center">
+                      <p className="text-dark font-medium">Số lượng</p>
                     </div>
 
-                    <div className="min-w-[150px]">
-                      <p className="text-dark">Subtotal</p>
+                    <div className="min-w-[130px] xl:w-32 xl:min-w-0 xl:text-center">
+                      <p className="text-dark font-medium">Tổng cộng</p>
                     </div>
 
-                    <div className="min-w-[125px]">
-                      <p className="text-dark text-left">Action</p>
+                    <div className="min-w-[125px] xl:w-24 xl:min-w-0 xl:text-center">
+                      <p className="text-dark font-medium">Hành động</p>
                     </div>
                   </div>
 
@@ -145,8 +144,7 @@ const Cart = () => {
               </div>
             </div>
 
-            <div className="flex flex-col lg:flex-row gap-7.5 xl:gap-11 mt-9">
-              <Discount />
+            <div className="flex flex-col lg:flex-row gap-7.5 xl:gap-11 mt-9 lg:justify-end">
               <OrderSummary />
             </div>
           </div>
@@ -185,13 +183,13 @@ const Cart = () => {
               </svg>
             </div>
 
-            <p className="pb-6">Your cart is empty!</p>
+            <p className="pb-6">Giỏ hàng của bạn đang trống!</p>
 
             <Link
               href="/shop-with-sidebar"
               className="w-96 mx-auto flex justify-center font-medium text-white bg-dark py-[13px] px-6 rounded-md ease-out duration-200 hover:bg-opacity-95"
             >
-              Continue Shopping
+              Tiếp tục mua sắm
             </Link>
           </div>
         </>

@@ -1,7 +1,38 @@
 import Link from "next/link";
 import React from "react";
 
-const Breadcrumb = ({ title, pages }) => {
+interface BreadcrumbProps {
+  title: string;
+  pages: Array<string | { label: string; href: string }>;
+}
+
+const Breadcrumb = ({ title, pages }: BreadcrumbProps) => {
+  // Map page names to their routes
+  const getPageRoute = (
+    page: string | { label: string; href: string }
+  ): string => {
+    if (typeof page === "object") {
+      return page.href;
+    }
+    // Default routes for common page names
+    const routeMap: { [key: string]: string } = {
+      checkout: "/checkout",
+      addresses: "/checkout/addresses",
+      cart: "/cart",
+      shop: "/shop",
+    };
+    return routeMap[page.toLowerCase()] || `/${page.toLowerCase()}`;
+  };
+
+  const getPageLabel = (
+    page: string | { label: string; href: string }
+  ): string => {
+    if (typeof page === "object") {
+      return page.label;
+    }
+    return page;
+  };
+
   return (
     <div className="overflow-hidden shadow-breadcrumb pt-[209px] sm:pt-[155px] lg:pt-[95px] xl:pt-[165px]">
       <div className="border-t border-gray-3">
@@ -17,11 +48,28 @@ const Breadcrumb = ({ title, pages }) => {
               </li>
 
               {pages.length > 0 &&
-                pages.map((page, key) => (
-                  <li className="text-custom-sm last:text-blue capitalize" key={key}>
-                    {page} 
-                  </li>
-                ))}
+                pages.map((page, key) => {
+                  const isLast = key === pages.length - 1;
+                  const pageLabel = getPageLabel(page);
+                  const pageRoute = getPageRoute(page);
+
+                  return (
+                    <li
+                      className={`text-custom-sm capitalize ${
+                        isLast ? "text-blue" : "hover:text-blue"
+                      }`}
+                      key={key}
+                    >
+                      {isLast ? (
+                        <span>{pageLabel}</span>
+                      ) : (
+                        <Link href={pageRoute} className="hover:text-blue">
+                          {pageLabel} /
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
             </ul>
           </div>
         </div>
