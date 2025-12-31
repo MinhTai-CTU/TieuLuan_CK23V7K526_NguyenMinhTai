@@ -88,8 +88,8 @@ const Hero = () => {
                       <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full mb-4">
                         <span className="text-sm font-semibold">
                           {banner.subtitle}
-                        </span>
-                      </div>
+                      </span>
+                    </div>
                     )}
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold mb-4 leading-tight">
                       {banner.title}
@@ -125,7 +125,7 @@ const Hero = () => {
                   {/* Image */}
                   <div className="relative h-[300px] sm:h-[400px] lg:h-[500px] flex items-center justify-center">
                     <div className="relative w-full h-full">
-                      <Image
+                    <Image
                         src={banner.image}
                         alt={banner.title}
                         fill

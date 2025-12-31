@@ -68,9 +68,14 @@ export default function AdminChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pusherRef = useRef<Pusher | null>(null);
   const channelRef = useRef<any>(null);
+  const selectedConversationRef = useRef<Conversation | null>(null);
 
   const user = getUser();
   const token = getToken();
+
+  useEffect(() => {
+    selectedConversationRef.current = selectedConversation;
+  }, [selectedConversation]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -115,36 +120,63 @@ export default function AdminChat() {
       });
     }
 
-    // Subscribe to admin chat channel
     if (!channelRef.current) {
       channelRef.current = pusherRef.current.subscribe("admin-chat");
-      channelRef.current.bind("new-message", (data: any) => {
-        // Reload conversations to update last message
+
+      channelRef.current.bind("new-message", async (data: any) => {
+        const currentConv = selectedConversationRef.current;
+
+        const isCurrentChat =
+          currentConv && data.conversationId === currentConv.id;
+
+        if (isCurrentChat) {
+          fetch(`/api/chat/conversations/${currentConv.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
+
         if (token) {
-          fetch("/api/chat/conversations", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          })
-            .then((res) => res.json())
-            .then((conversationsData) => {
-              if (conversationsData.success) {
-                setConversations(conversationsData.data);
-                // If this is the selected conversation, add message to messages list
-                if (
-                  selectedConversation &&
-                  data.conversationId === selectedConversation.id
-                ) {
-                  setMessages((prev) => {
-                    // Check if message already exists to avoid duplicates
-                    if (prev.some((msg) => msg.id === data.message.id)) {
-                      return prev;
-                    }
-                    return [...prev, data.message];
-                  });
-                }
-              }
+          try {
+            const res = await fetch("/api/chat/conversations", {
+              headers: { Authorization: `Bearer ${token}` },
             });
+            const conversationsData = await res.json();
+
+            if (conversationsData.success) {
+              let newConversations = conversationsData.data;
+              if (isCurrentChat) {
+                newConversations = newConversations.map((c: any) => {
+                  if (c.id === currentConv.id) {
+                    return {
+                      ...c,
+                      _count: { messages: 0 },
+                    };
+                  }
+                  return c;
+                });
+              }
+
+              setConversations(newConversations);
+              if (isCurrentChat) {
+                setMessages((prev) => {
+                  if (prev.some((msg) => msg.id === data.message.id)) {
+                    return prev;
+                  }
+
+                  const newMessage = { ...data.message, isRead: true };
+                  return [...prev, newMessage];
+                });
+
+                setTimeout(() => {
+                  messagesEndRef.current?.scrollIntoView({
+                    behavior: "smooth",
+                  });
+                }, 100);
+              }
+            }
+          } catch (error) {
+            console.error("Lỗi cập nhật realtime:", error);
+          }
         }
       });
     }
@@ -156,9 +188,8 @@ export default function AdminChat() {
         channelRef.current = null;
       }
     };
-  }, [user, token, selectedConversation]);
+  }, [user, token]);
 
-  // Load messages when conversation is selected
   useEffect(() => {
     if (!selectedConversation || !token) return;
 
@@ -174,6 +205,7 @@ export default function AdminChat() {
         );
 
         const data = await res.json();
+        console.log(data);
         if (data.success) {
           setMessages(data.data.messages || []);
           setSelectedConversation(data.data.conversation);

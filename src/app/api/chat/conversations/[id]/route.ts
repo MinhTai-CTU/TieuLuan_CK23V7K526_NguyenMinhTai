@@ -80,32 +80,25 @@ export async function GET(
     // Admin: chỉ thấy tin nhắn từ khách hàng (không thấy tin nhắn của chính mình)
     // Customer: thấy tất cả tin nhắn
     const messages = await prisma.message.findMany({
-      where: isAdmin
-        ? {
-            conversationId,
-            sender: {
-              userRoles: {
-                none: {
-                  role: {
-                    name: "ADMIN",
-                  },
-                },
-              },
-            },
-          }
-        : { conversationId },
+      where: {
+        conversationId: conversationId,
+      },
       include: {
         sender: {
           select: {
             id: true,
             name: true,
             avatar: true,
+            userRoles: {
+              include: {
+                role: true,
+              },
+            },
           },
         },
       },
       orderBy: { createdAt: "asc" },
     });
-
     // Đánh dấu tin nhắn đã đọc
     await prisma.message.updateMany({
       where: {

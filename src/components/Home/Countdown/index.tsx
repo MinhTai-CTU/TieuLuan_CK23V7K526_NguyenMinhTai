@@ -3,40 +3,78 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
+// 1. Định nghĩa kiểu dữ liệu dựa trên response API
+interface FlashSaleData {
+  id: string;
+  title: string;
+  tagline: string;
+  description: string;
+  image: string;
+  link: string;
+  buttonText: string;
+  endDate: string;
+  isActive: boolean;
+}
+
 const CounDown = () => {
+  // State lưu dữ liệu API
+  const [bannerData, setBannerData] = useState<FlashSaleData | null>(null);
+
+  // State bộ đếm
   const [days, setDays] = useState(0);
   const [hours, setHours] = useState(0);
   const [minutes, setMinutes] = useState(0);
   const [seconds, setSeconds] = useState(0);
 
-  const deadline = "December, 31, 2024";
+  useEffect(() => {
+    const fetchBanner = async () => {
+      try {
+        const res = await fetch("/api/admin/banners?type=FLASH_SALE");
+        const json = await res.json();
+
+        if (json.success && json.data) {
+          setBannerData(json.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch flash sale banner:", error);
+      }
+    };
+
+    fetchBanner();
+  }, []);
 
   const getTime = () => {
-    const time = Date.parse(deadline) - Date.now();
+    if (!bannerData?.endDate) return;
+
+    const time = Date.parse(bannerData.endDate) - Date.now();
 
     if (time <= 0) {
       setDays(0);
       setHours(0);
       setMinutes(0);
       setSeconds(0);
-      return;
+    } else {
+      setDays(Math.floor(time / (1000 * 60 * 60 * 24)));
+      setHours(Math.floor((time / (1000 * 60 * 60)) % 24));
+      setMinutes(Math.floor((time / 1000 / 60) % 60));
+      setSeconds(Math.floor((time / 1000) % 60));
     }
-
-    setDays(Math.floor(time / (1000 * 60 * 60 * 24)));
-    setHours(Math.floor((time / (1000 * 60 * 60)) % 24));
-    setMinutes(Math.floor((time / 1000 / 60) % 60));
-    setSeconds(Math.floor((time / 1000) % 60));
   };
 
   useEffect(() => {
-    getTime(); // Initial call
+    getTime();
+
     const interval = setInterval(getTime, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [bannerData]);
 
   const formatNumber = (num: number) => {
     return num < 10 ? `0${num}` : num.toString();
   };
+
+  if (!bannerData || !bannerData.isActive) {
+    return null;
+  }
 
   return (
     <section className="overflow-hidden py-20 bg-gray-2">
@@ -45,16 +83,21 @@ const CounDown = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Content */}
             <div className="relative z-10">
-              <span className="inline-block font-semibold text-sm sm:text-base text-blue-600 mb-3 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-full">
-                Đừng bỏ lỡ!!
-              </span>
+              {/* Tagline */}
+              {bannerData.tagline && (
+                <span className="inline-block font-semibold text-sm sm:text-base text-blue-600 mb-3 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-full">
+                  {bannerData.tagline}
+                </span>
+              )}
 
+              {/* Title */}
               <h2 className="font-bold text-dark text-2xl sm:text-3xl lg:text-4xl xl:text-5xl mb-4 leading-tight">
-                Khám phá sản phẩm mới nhất
+                {bannerData.title}
               </h2>
 
+              {/* Description */}
               <p className="text-gray-700 text-sm sm:text-base mb-6">
-                Khám phá sản phẩm mới nhất
+                {bannerData.description}
               </p>
 
               {/* Countdown timer - Grid layout 2x2 */}
@@ -108,11 +151,12 @@ const CounDown = () => {
                 </div>
               </div>
 
+              {/* Button Link */}
               <Link
-                href="/shop-with-sidebar"
+                href={bannerData.link || "#"}
                 className="inline-flex items-center gap-2 font-semibold text-sm sm:text-base text-white bg-blue-600 hover:bg-blue-700 py-3 px-6 sm:px-8 rounded-lg transition-all transform hover:scale-105 shadow-lg"
               >
-                Khám phá ngay!
+                {bannerData.buttonText || "Xem ngay"}
                 <svg
                   className="w-5 h-5"
                   fill="none"
@@ -132,13 +176,16 @@ const CounDown = () => {
             {/* Product Image */}
             <div className="relative hidden lg:block">
               <div className="relative w-full h-[400px] xl:h-[500px]">
-                <Image
-                  src="/images/countdown/countdown-01.png"
-                  alt="Headphone product"
-                  fill
-                  className="object-contain object-center drop-shadow-2xl"
-                  priority
-                />
+                {/* Chỉ hiển thị ảnh nếu có đường dẫn hợp lệ */}
+                {bannerData.image && (
+                  <Image
+                    src={bannerData.image}
+                    alt={bannerData.title}
+                    fill
+                    className="object-contain object-center drop-shadow-2xl"
+                    priority
+                  />
+                )}
               </div>
             </div>
           </div>

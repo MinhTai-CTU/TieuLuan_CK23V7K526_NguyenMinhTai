@@ -73,25 +73,74 @@ export default function BannersList() {
     isActive: true,
   });
 
-  // Mock Data cho Flash Sale
   const [flashSaleData, setFlashSaleData] = useState<FlashSaleConfig>({
-    tagline: "Đừng bỏ lỡ!!",
-    title: "Khám phá sản phẩm mới nhất",
-    description: "Khám phá sản phẩm mới nhất",
-    endDate: "2025-12-31T23:59",
-    image: "", // Để trống hoặc điền URL ảnh mẫu
-    link: "/products/new-arrival",
-    buttonText: "Khám phá ngay!",
+    tagline: "",
+    title: "",
+    description: "",
+    endDate: "",
+    image: "", // Nếu muốn hiện ảnh placeholder thì để chuỗi rỗng
+    link: "",
+    buttonText: "",
     isActive: true,
   });
 
-  // --- EFFECTS ---
+  // const [flashSaleData, setFlashSaleData] = useState<FlashSaleConfig>({
+  //   tagline: "Cơ hội cuối cùng trong năm",
+  //   title: "Siêu Sale Công Nghệ - Giảm đến 50%",
+  //   description:
+  //     "Săn ngay iPhone 15, MacBook và phụ kiện chính hãng với giá cực sốc. Số lượng có hạn!",
+  //   endDate: "2025-12-31T23:59:59",
+  //   image: "",
+  //   link: "/collections/tech-flash-sale",
+  //   buttonText: "Săn Deal Ngay",
+  //   isActive: true,
+  // });
+
+  const [previewTime, setPreviewTime] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  });
+
+  useEffect(() => {
+    if (!flashSaleData.endDate) {
+      setPreviewTime({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      return;
+    }
+
+    const calculateTime = () => {
+      const endTime = new Date(flashSaleData.endDate).getTime();
+      const now = new Date().getTime();
+      const distance = endTime - now;
+
+      if (distance <= 0) {
+        setPreviewTime({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      } else {
+        setPreviewTime({
+          days: Math.floor(distance / (1000 * 60 * 60 * 24)),
+          hours: Math.floor(
+            (distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+          ),
+          minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((distance % (1000 * 60)) / 1000),
+        });
+      }
+    };
+
+    calculateTime();
+
+    const timer = setInterval(calculateTime, 1000);
+
+    return () => clearInterval(timer);
+  }, [flashSaleData.endDate]);
+
+  const formatNumber = (num: number) => (num < 10 ? `0${num}` : num.toString());
 
   useEffect(() => {
     fetchBanners();
+    fetchFlashSaleConfig();
   }, []);
-
-  // --- API HANDLERS (REAL) ---
 
   const fetchBanners = async () => {
     try {
@@ -101,8 +150,8 @@ export default function BannersList() {
         setLoading(false);
         return;
       }
-
-      const response = await fetch("/api/admin/banners", {
+      // api/admin/banners?type=SLIDER
+      const response = await fetch("/api/admin/banners?type=SLIDER", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -123,6 +172,37 @@ export default function BannersList() {
     }
   };
 
+  const fetchFlashSaleConfig = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch("/api/admin/banners?type=FLASH_SALE", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      console.log(data);
+
+      if (response.ok && data.success) {
+        const banner = data.data;
+        console.log("banner", banner);
+        setFlashSaleData({
+          tagline: banner.tagline || "",
+          title: banner.title || "",
+          description: banner.description || "",
+          // Chuyển đổi format ngày cho input datetime-local (YYYY-MM-DDTHH:mm)
+          endDate: banner.endDate
+            ? new Date(banner.endDate).toISOString().slice(0, 16)
+            : "",
+          image: banner.image || "",
+          link: banner.link || "",
+          buttonText: banner.buttonText || "",
+          isActive: banner.isActive,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     isFlashSale = false
@@ -130,7 +210,7 @@ export default function BannersList() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate
+    // 1. Validate file
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
       toast.error("Chỉ chấp nhận file ảnh: JPEG, PNG, WebP");
@@ -141,16 +221,8 @@ export default function BannersList() {
       return;
     }
 
-    // Nếu là Flash Sale -> Dùng Mock (không gọi API)
-    if (isFlashSale) {
-      const mockUrl = URL.createObjectURL(file);
-      setFlashSaleData({ ...flashSaleData, image: mockUrl });
-      toast.success("Đã chọn ảnh (Mock)");
-      return;
-    }
-
-    // Nếu là Slider -> Gọi API thật
     setIsUploading(true);
+
     try {
       const token = getToken();
       if (!token) {
@@ -158,28 +230,41 @@ export default function BannersList() {
         return;
       }
 
+      // 2. Tạo FormData để gửi file lên Server
       const uploadFormData = new FormData();
       uploadFormData.append("image", file);
 
       const response = await fetch("/api/admin/banners/upload-image", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: uploadFormData,
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
+        // Lấy đường dẫn thật từ Server trả về (VD: /uploads/image-123.png)
         const imageUrl = data.data.imageUrl;
-        setFormData({ ...formData, image: imageUrl });
-        setImagePreview(imageUrl);
+
+        // 4. Cập nhật vào State tương ứng
+        if (isFlashSale) {
+          // Nếu là Flash Sale
+          setFlashSaleData({ ...flashSaleData, image: imageUrl });
+        } else {
+          // Nếu là Slider
+          setFormData({ ...formData, image: imageUrl });
+          setImagePreview(imageUrl);
+        }
+
         toast.success("Đã upload ảnh thành công");
       } else {
         toast.error(data.error || "Không thể upload ảnh");
       }
     } catch (error) {
       console.error("Error uploading image:", error);
-      toast.error("Không thể upload ảnh");
+      toast.error("Lỗi kết nối khi upload ảnh");
     } finally {
       setIsUploading(false);
     }
@@ -349,15 +434,34 @@ export default function BannersList() {
     setImagePreview(null);
   };
 
-  const handleSaveFlashSale = (e: React.FormEvent) => {
+  const handleSaveFlashSale = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Mock save
-    setTimeout(() => {
+
+    try {
+      const token = getToken();
+      // Gọi vào route riêng biệt chúng ta vừa tạo ở bước 2
+      const response = await fetch("/api/admin/banners/flash-sale", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(flashSaleData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success("Đã lưu cấu hình Flash Sale!");
+      } else {
+        toast.error(data.error || "Lỗi khi lưu");
+      }
+    } catch (error) {
+      toast.error("Lỗi kết nối");
+    } finally {
       setIsSubmitting(false);
-      toast.success("Đã lưu cấu hình Flash Sale (Mock)");
-      console.log("Flash Sale Config:", flashSaleData);
-    }, 1000);
+    }
   };
 
   // --- RENDER ---
@@ -560,7 +664,7 @@ export default function BannersList() {
               <form onSubmit={handleSaveFlashSale} className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Tagline (Góc trên)
+                    Tagline
                   </label>
                   <input
                     type="text"
@@ -726,16 +830,21 @@ export default function BannersList() {
                     </div>
 
                     <div className="flex gap-2 text-center">
-                      {["02", "12", "45", "30"].map((num, i) => (
+                      {[
+                        { value: previewTime.days, label: "Ngày" },
+                        { value: previewTime.hours, label: "Giờ" },
+                        { value: previewTime.minutes, label: "Phút" },
+                        { value: previewTime.seconds, label: "Giây" },
+                      ].map((item, i) => (
                         <div
                           key={i}
-                          className="bg-white rounded-lg p-2 min-w-[50px] shadow-sm"
+                          className="bg-white rounded-lg p-2 min-w-[50px] shadow-sm text-center"
                         >
                           <div className="text-lg font-bold text-gray-900">
-                            {num}
+                            {formatNumber(item.value)}
                           </div>
                           <div className="text-[10px] text-gray-500 uppercase">
-                            {["Ngày", "Giờ", "Phút", "Giây"][i]}
+                            {item.label}
                           </div>
                         </div>
                       ))}

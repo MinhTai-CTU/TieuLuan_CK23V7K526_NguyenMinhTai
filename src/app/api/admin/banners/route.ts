@@ -1,106 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/middleware/auth";
-import { PERMISSIONS } from "@/lib/permissions";
 
-// GET /api/admin/banners - Get all banners (for admin)
 export async function GET(request: NextRequest) {
   try {
-    // Check permission - use PRODUCTS_CREATE as it's similar content management
-    const permissionCheck = await requirePermission(
-      request,
-      PERMISSIONS.PRODUCTS_CREATE
-    );
-    if (permissionCheck) {
-      return permissionCheck;
-    }
+    // 1. Lấy tham số type từ URL
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get("type");
 
-    const banners = await prisma.banner.findMany({
-      orderBy: {
-        order: "asc",
-      },
-    });
-
-    return NextResponse.json({ success: true, data: banners });
-  } catch (error) {
-    console.error("Error fetching banners:", error);
-    return NextResponse.json(
-      { success: false, error: "Không thể tải danh sách banners" },
-      { status: 500 }
-    );
-  }
-}
-
-// POST /api/admin/banners - Create new banner
-export async function POST(request: NextRequest) {
-  try {
-    // Check permission
-    const permissionCheck = await requirePermission(
-      request,
-      PERMISSIONS.PRODUCTS_CREATE
-    );
-    if (permissionCheck) {
-      return permissionCheck;
-    }
-
-    const body = await request.json();
-    const {
-      title,
-      subtitle,
-      description,
-      image,
-      link,
-      buttonText,
-      bgGradient,
-      order,
-      isActive,
-    } = body;
-
-    // Validation
-    if (!title || !image) {
-      return NextResponse.json(
-        { success: false, error: "Tiêu đề và hình ảnh là bắt buộc" },
-        { status: 400 }
-      );
-    }
-
-    const newOrder = order || 0;
-
-    // Nếu order mới nhỏ hơn order của banner hiện có, cần tăng order của các banner >= newOrder lên 1
-    if (newOrder > 0) {
-      await prisma.banner.updateMany({
+    // 2. Nếu type là FLASH_SALE -> Trả về 1 Object duy nhất
+    if (type === "FLASH_SALE") {
+      const flashSaleBanner = await prisma.banner.findFirst({
         where: {
-          order: {
-            gte: newOrder,
-          },
+          type: "FLASH_SALE",
         },
-        data: {
-          order: {
-            increment: 1,
-          },
-        },
+      });
+
+      // Quan trọng: Trả về data là Object (flashSaleBanner), không phải mảng
+      return NextResponse.json({
+        success: true,
+        data: flashSaleBanner,
       });
     }
 
-    const banner = await prisma.banner.create({
-      data: {
-        title,
-        subtitle: subtitle || null,
-        description: description || null,
-        image,
-        link: link || null,
-        buttonText: buttonText || null,
-        bgGradient: bgGradient || null,
-        order: newOrder,
-        isActive: isActive !== undefined ? isActive : true,
-      },
+    // 3. Nếu type là SLIDER -> Trả về Mảng các slider
+    if (type === "SLIDER") {
+      const sliders = await prisma.banner.findMany({
+        where: { type: "SLIDER" },
+        orderBy: { order: "asc" },
+      });
+      return NextResponse.json({ success: true, data: sliders });
+    }
+
+    // 4. Mặc định (nếu không truyền type) -> Trả về tất cả (cho mục đích debug hoặc list tổng)
+    const allBanners = await prisma.banner.findMany({
+      orderBy: { order: "asc" },
     });
 
-    return NextResponse.json({ success: true, data: banner });
+    return NextResponse.json({
+      success: true,
+      data: allBanners,
+    });
   } catch (error) {
-    console.error("Error creating banner:", error);
+    console.error("Error fetching banners:", error);
     return NextResponse.json(
-      { success: false, error: "Không thể tạo banner" },
+      { success: false, error: "Lỗi Server" },
       { status: 500 }
     );
   }
