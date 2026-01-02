@@ -172,15 +172,15 @@ const Signin = () => {
 
   return (
     <>
-      <Breadcrumb title={"Signin"} pages={["Signin"]} />
+      <Breadcrumb title={"Đăng nhập"} pages={["Signin"]} />
       <section className="overflow-hidden py-20 bg-gray-2">
         <div className="max-w-[1170px] w-full mx-auto px-4 sm:px-8 xl:px-0">
           <div className="max-w-[570px] w-full mx-auto rounded-xl bg-white shadow-1 p-4 sm:p-7.5 xl:p-11">
             <div className="text-center mb-11">
               <h2 className="font-semibold text-xl sm:text-2xl xl:text-heading-5 text-dark mb-1.5">
-                Sign In to Your Account
+                Đăng nhập vào tài khoản của bạn
               </h2>
-              <p>Enter your detail below</p>
+              <p>Nhập thông tin chi tiết của bạn dưới đây</p>
             </div>
 
             <div>
@@ -194,7 +194,7 @@ const Signin = () => {
                     type="email"
                     id="email"
                     {...register("email")}
-                    placeholder="Enter your email"
+                    placeholder="Nhập email của bạn"
                     className={`rounded-lg border ${
                       errors.email ? "border-red" : "border-gray-3"
                     } bg-gray-1 placeholder:text-dark-5 w-full py-3 px-5 outline-none duration-200 focus:border-transparent focus:shadow-input focus:ring-2 focus:ring-blue/20`}
@@ -209,14 +209,14 @@ const Signin = () => {
 
                 <div className="mb-5">
                   <label htmlFor="password" className="block mb-2.5">
-                    Password
+                    Mật khẩu
                   </label>
 
                   <input
                     type="password"
                     id="password"
                     {...register("password")}
-                    placeholder="Enter your password"
+                    placeholder="Nhập mật khẩu của bạn"
                     autoComplete="on"
                     className={`rounded-lg border ${
                       errors.password ? "border-red" : "border-gray-3"
@@ -257,23 +257,23 @@ const Signin = () => {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                         ></path>
                       </svg>
-                      Signing in...
+                      Đang đăng nhập...
                     </>
                   ) : (
-                    "Sign in to account"
+                    "Đăng nhập"
                   )}
                 </button>
 
-                <a
-                  href="#"
+                <Link
+                  href="/forgot-password"
                   className="block text-center text-dark-4 mt-4.5 ease-out duration-200 hover:text-dark"
                 >
-                  Forget your password?
-                </a>
+                  Quên mật khẩu?
+                </Link>
 
                 <span className="relative z-1 block font-medium text-center mt-4.5">
                   <span className="block absolute -z-1 left-0 top-1/2 h-px w-full bg-gray-3"></span>
-                  <span className="inline-block px-3 bg-white">Or</span>
+                  <span className="inline-block px-3 bg-white">Hoặc</span>
                 </span>
 
                 <div className="flex flex-col gap-4.5 mt-4.5">
@@ -335,7 +335,7 @@ const Signin = () => {
                         </clipPath>
                       </defs>
                     </svg>
-                    Sign In with Google
+                    Đăng nhập với Google
                   </button>
 
                   <button
@@ -364,17 +364,17 @@ const Signin = () => {
                         fill="#1877F2"
                       />
                     </svg>
-                    Sign In with Facebook
+                    Đăng nhập với Facebook
                   </button>
                 </div>
 
                 <p className="text-center mt-6">
-                  Don&apos;t have an account?
+                  Không có tài khoản?
                   <Link
                     href="/signup"
                     className="text-dark ease-out duration-200 hover:text-blue pl-2"
                   >
-                    Sign Up Now!
+                    Đăng ký ngay!
                   </Link>
                 </p>
               </form>

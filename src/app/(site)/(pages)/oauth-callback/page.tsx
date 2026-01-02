@@ -114,7 +114,7 @@ export default function OAuthCallbackPage() {
             updateUser(userData.data.user);
 
             setStatus("success");
-            setMessage("Login successful! Redirecting...");
+            setMessage("Đăng nhập thành công! Đang chuyển hướng...");
 
             // Only show toast once
             if (!toastShown.current) {
@@ -181,10 +181,10 @@ export default function OAuthCallbackPage() {
             <div className="text-center">
               <div className="inline-block h-16 w-16 animate-spin rounded-full border-4 border-solid border-blue border-t-transparent mb-6"></div>
               <h2 className="font-semibold text-xl sm:text-2xl xl:text-heading-5 text-dark mb-4">
-                Completing login...
+                Đang hoàn tất đăng nhập...
               </h2>
               <p className="text-dark-4">
-                Please wait while we complete your login.
+                Vui lòng chờ trong khi chúng tôi hoàn tất đăng nhập của bạn.
               </p>
             </div>
           )}
@@ -207,7 +207,7 @@ export default function OAuthCallbackPage() {
                 </svg>
               </div>
               <h2 className="font-semibold text-xl sm:text-2xl xl:text-heading-5 text-dark mb-4">
-                Login Successful!
+                Đăng nhập thành công!
               </h2>
               <p className="text-dark-4 mb-6">{message}</p>
             </div>
@@ -231,24 +231,24 @@ export default function OAuthCallbackPage() {
                 </svg>
               </div>
               <h2 className="font-semibold text-xl sm:text-2xl xl:text-heading-5 text-dark mb-4">
-                Login Failed
+                Đăng nhập thất bại
               </h2>
               <p className="text-dark-4 mb-6 whitespace-pre-line">{message}</p>
               <p className="text-sm text-dark-4 mb-6">
-                Redirecting to sign in page...
+                Đang chuyển hướng đến trang đăng nhập...
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
                   href="/signin"
                   className="inline-block font-medium text-white bg-blue py-3 px-6 rounded-lg ease-out duration-200 hover:bg-blue/90"
                 >
-                  Go to Sign In
+                  Đến trang đăng nhập
                 </Link>
                 <Link
                   href="/signup"
                   className="inline-block font-medium text-dark border border-gray-3 py-3 px-6 rounded-lg ease-out duration-200 hover:bg-gray-1"
                 >
-                  Sign Up Instead
+                  Đăng ký
                 </Link>
               </div>
             </div>

@@ -21,7 +21,7 @@ export default function VerifyEmailPage() {
 
     if (!token) {
       setStatus("error");
-      setMessage("Verification token is missing");
+      setMessage("Token xác minh không tồn tại");
       return;
     }
 
@@ -37,7 +37,7 @@ export default function VerifyEmailPage() {
         // Some APIs return 200 even for errors, or 400 with success:true
         if (data.success) {
           setStatus("success");
-          setMessage(data.message || "Email verified successfully!");
+          setMessage(data.message || "Email xác minh thành công!");
           toast.success("Xác minh email thành công!");
 
           // Redirect to signin after 3 seconds
@@ -47,7 +47,7 @@ export default function VerifyEmailPage() {
         } else {
           // Only show error if success is explicitly false
           setStatus("error");
-          setMessage(data.error || "Failed to verify email");
+          setMessage(data.error || "Xác minh email thất bại");
           toast.error(data.error || "Xác minh email thất bại");
           // Reset flag on error so user can retry
           hasVerified.current = false;
@@ -56,9 +56,7 @@ export default function VerifyEmailPage() {
       .catch((error) => {
         console.error("Verification error:", error);
         setStatus("error");
-        setMessage(
-          error.message || "An error occurred while verifying your email"
-        );
+        setMessage(error.message || "Đã xảy ra lỗi khi xác minh email của bạn");
         toast.error(
           error.message || "Đã xảy ra lỗi khi xác minh email của bạn"
         );
@@ -75,10 +73,10 @@ export default function VerifyEmailPage() {
             <div className="text-center">
               <div className="inline-block h-16 w-16 animate-spin rounded-full border-4 border-solid border-blue border-t-transparent mb-6"></div>
               <h2 className="font-semibold text-xl sm:text-2xl xl:text-heading-5 text-dark mb-4">
-                Verifying your email...
+                Xác minh email...
               </h2>
               <p className="text-dark-4">
-                Please wait while we verify your email address.
+                Vui lòng chờ trong khi chúng tôi xác minh địa chỉ email của bạn.
               </p>
             </div>
           )}
@@ -101,17 +99,17 @@ export default function VerifyEmailPage() {
                 </svg>
               </div>
               <h2 className="font-semibold text-xl sm:text-2xl xl:text-heading-5 text-dark mb-4">
-                Email Verified!
+                Email đã được xác minh!
               </h2>
               <p className="text-dark-4 mb-6">{message}</p>
               <p className="text-sm text-dark-4 mb-6">
-                Redirecting to sign in page...
+                Chuyển hướng đến trang đăng nhập...
               </p>
               <Link
                 href="/signin"
                 className="inline-block font-medium text-white bg-blue py-3 px-6 rounded-lg ease-out duration-200 hover:bg-blue/90"
               >
-                Go to Sign In
+                Đến trang đăng nhập
               </Link>
             </div>
           )}
@@ -134,7 +132,7 @@ export default function VerifyEmailPage() {
                 </svg>
               </div>
               <h2 className="font-semibold text-xl sm:text-2xl xl:text-heading-5 text-dark mb-4">
-                Verification Failed
+                Xác minh thất bại
               </h2>
               <p className="text-dark-4 mb-6">{message}</p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -142,13 +140,13 @@ export default function VerifyEmailPage() {
                   href="/signin"
                   className="inline-block font-medium text-white bg-blue py-3 px-6 rounded-lg ease-out duration-200 hover:bg-blue/90"
                 >
-                  Go to Sign In
+                  Đến trang đăng nhập
                 </Link>
                 <Link
                   href="/signup"
                   className="inline-block font-medium text-dark border border-gray-3 py-3 px-6 rounded-lg ease-out duration-200 hover:bg-gray-1"
                 >
-                  Sign Up Again
+                  Đăng ký lại
                 </Link>
               </div>
             </div>

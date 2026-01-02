@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "No token provided",
+          error: "Không có token được cung cấp",
         },
         { status: 401 }
       );
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid or expired token",
+          error: "Token không hợp lệ hoặc đã hết hạn",
         },
         { status: 401 }
       );
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "User not found",
+          error: "Tài khoản không tồn tại",
         },
         { status: 404 }
       );
@@ -115,7 +115,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            error: "Tài khoản chưa có mật khẩu. Vui lòng đặt mật khẩu trước.",
+            error:
+              "Tài khoản chưa có mật khẩu. Vui lòng đặt mật khẩu trước khi đổi mật khẩu.",
           },
           { status: 400 }
         );
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            error: "Mật khẩu hiện tại không đúng",
+            error: "Mật khẩu hiện tại không chính xác",
           },
           { status: 400 }
         );
@@ -174,7 +175,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to change password",
+        error: "Đã xảy ra lỗi khi đổi mật khẩu",
         details: error.message,
       },
       { status: 500 }

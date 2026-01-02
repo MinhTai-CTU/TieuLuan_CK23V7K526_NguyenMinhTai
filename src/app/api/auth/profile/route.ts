@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "No token provided",
+          error: "Không có token được cung cấp",
         },
         { status: 401 }
       );
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid or expired token",
+          error: "Token không hợp lệ hoặc đã hết hạn",
         },
         { status: 401 }
       );
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "User not found",
+          error: "Tài khoản không tồn tại",
         },
         { status: 404 }
       );
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to fetch profile",
+        error: "Đã xảy ra lỗi khi lấy thông tin tài khoản",
       },
       { status: 500 }
     );
@@ -93,7 +93,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "No token provided",
+          error: "Không có token được cung cấp",
         },
         { status: 401 }
       );
@@ -104,7 +104,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid or expired token",
+          error: "Token không hợp lệ hoặc đã hết hạn",
         },
         { status: 401 }
       );
@@ -171,7 +171,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Profile updated successfully",
+      message: "Cập nhật thông tin tài khoản thành công",
       data: {
         user: {
           ...updatedUser,
@@ -185,7 +185,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to update profile",
+        error: "Đã xảy ra lỗi khi cập nhật thông tin tài khoản",
       },
       { status: 500 }
     );

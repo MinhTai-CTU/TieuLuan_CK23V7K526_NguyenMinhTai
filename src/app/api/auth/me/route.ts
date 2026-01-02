@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "No token provided",
+          error: "Không có token được cung cấp",
         },
         { status: 401 }
       );
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid or expired token",
+          error: "Token không hợp lệ hoặc đã hết hạn",
         },
         { status: 401 }
       );
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "User not found",
+          error: "Tài khoản không tồn tại",
         },
         { status: 404 }
       );
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Your account has been banned",
+          error: "Tài khoản của bạn đã bị khóa",
           isBanned: true,
           bannedAt: user.bannedAt,
           bannedReason: user.bannedReason,
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to get user",
+        error: "Đã xảy ra lỗi khi lấy thông tin tài khoản",
       },
       { status: 500 }
     );

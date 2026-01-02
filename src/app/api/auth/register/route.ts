@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Email and password are required",
+          error: "Email và mật khẩu là bắt buộc",
         },
         { status: 400 }
       );
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "User with this email already exists",
+          error: "Tài khoản với email này đã tồn tại",
         },
         { status: 400 }
       );
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Customer role not found. Please run seed script.",
+          error: "Vai trò khách hàng không tồn tại. Vui lòng chạy script seed.",
         },
         { status: 500 }
       );
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         message:
-          "Account created successfully. Please check your email to verify your account.",
+          "Tài khoản đã được tạo thành công. Vui lòng kiểm tra email để xác minh tài khoản.",
         data: {
           user: {
             id: user.id,
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to register user",
+        error: "Đã xảy ra lỗi khi đăng ký tài khoản",
       },
       { status: 500 }
     );

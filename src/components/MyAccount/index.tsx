@@ -291,7 +291,7 @@ const MyAccount = () => {
                           fill=""
                         />
                       </svg>
-                      Địa chỉ của tôi
+                      Địa chỉ
                     </button>
 
                     <button
@@ -423,9 +423,7 @@ const MyAccount = () => {
             >
               <div className="bg-white rounded-xl shadow-1 p-4 sm:p-7.5">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-medium text-xl text-dark">
-                    Địa chỉ của tôi
-                  </h2>
+                  <h2 className="font-medium text-xl text-dark">Địa chỉ</h2>
                   <button
                     className="text-blue ease-out duration-200 hover:text-blue-600 flex items-center gap-2"
                     onClick={() => openAddressModal()}

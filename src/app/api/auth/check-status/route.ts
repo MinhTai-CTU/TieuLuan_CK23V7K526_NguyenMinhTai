@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "No token provided",
+          error: "Không có token được cung cấp",
           isValid: false,
         },
         { status: 401 }
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid or expired token",
+          error: "Token không hợp lệ hoặc đã hết hạn",
           isValid: false,
         },
         { status: 401 }
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "User not found",
+          error: "Tài khoản không tồn tại",
           isValid: false,
         },
         { status: 404 }
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Your account has been banned",
+          error: "Tài khoản của bạn đã bị khóa",
           isValid: false,
           isBanned: true,
           bannedAt: user.bannedAt,
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Email not verified",
+          error: "Email chưa được xác minh",
           isValid: false,
           requiresVerification: true,
         },
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to check user status",
+        error: "Đã xảy ra lỗi khi kiểm tra trạng thái tài khoản",
         isValid: false,
       },
       { status: 500 }

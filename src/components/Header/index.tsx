@@ -314,7 +314,7 @@ const Header = () => {
                               }}
                               className="w-full text-left px-4 py-2 text-sm text-red hover:bg-gray-1 transition-colors"
                             >
-                              Logout
+                              Đăng xuất
                             </button>
                           </div>
                         </div>

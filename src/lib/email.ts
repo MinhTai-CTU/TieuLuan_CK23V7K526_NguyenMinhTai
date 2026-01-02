@@ -289,3 +289,85 @@ export async function verifyEmailConfig(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Gửi email đặt lại mật khẩu
+ */
+export async function sendPasswordResetEmail(
+  email: string,
+  token: string,
+  name?: string | null
+): Promise<void> {
+  const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/reset-password?token=${token}`;
+
+  const mailOptions = {
+    from: `"${process.env.SMTP_FROM_NAME || "NextMerce"}" <${process.env.SMTP_FROM_EMAIL || emailConfig.auth.user}>`,
+    to: email,
+    subject: "Yêu cầu đặt lại mật khẩu",
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Đặt lại mật khẩu</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #3C50E0 0%, #8B5CF6 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0;">Đặt lại mật khẩu</h1>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px;">Xin chào ${name || "bạn"},</p>
+          
+          <p style="font-size: 16px;">
+            Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.
+            Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.
+          </p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" 
+               style="display: inline-block; background: #3C50E0; color: white; 
+                      padding: 15px 30px; text-decoration: none; border-radius: 5px; 
+                      font-weight: bold; font-size: 16px;">
+              Đặt lại mật khẩu ngay
+            </a>
+          </div>
+          
+          <p style="font-size: 14px; color: #666;">
+            Link này sẽ hết hạn sau 1 giờ vì lý do bảo mật.
+          </p>
+
+           <p style="font-size: 12px; color: #667eea; word-break: break-all; background: #fff; padding: 10px; border-radius: 5px;">
+            ${resetUrl}
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <p style="font-size: 12px; color: #999; text-align: center;">
+            Email được gửi tự động. Vui lòng không trả lời.
+          </p>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `
+      Yêu cầu đặt lại mật khẩu
+      
+      Xin chào ${name || "bạn"},
+      
+      Vui lòng truy cập đường dẫn sau để đặt lại mật khẩu của bạn:
+      ${resetUrl}
+      
+      Link có hiệu lực trong 1 giờ.
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Password reset email sent to ${email}`);
+  } catch (error) {
+    console.error("Error sending password reset email:", error);
+    throw new Error("Failed to send password reset email");
+  }
+}

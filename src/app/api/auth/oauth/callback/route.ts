@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "No session found",
+          error: "Không tìm thấy phiên đăng nhập",
         },
         { status: 401 }
       );
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "User not found",
+          error: "Tài khoản không tồn tại",
         },
         { status: 404 }
       );
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Account is banned",
+          error: "Tài khoản của bạn đã bị khóa",
         },
         { status: 403 }
       );
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Token generation failed",
+          error: "Đã xảy ra lỗi khi tạo token",
         },
         { status: 500 }
       );
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "OAuth callback failed",
+        error: "Đã xảy ra lỗi khi đăng nhập qua OAuth",
       },
       { status: 500 }
     );

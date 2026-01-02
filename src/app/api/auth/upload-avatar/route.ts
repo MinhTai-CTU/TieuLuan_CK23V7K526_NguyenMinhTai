@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "No token provided",
+          error: "Không có token được cung cấp",
         },
         { status: 401 }
       );
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid or expired token",
+          error: "Token không hợp lệ hoặc đã hết hạn",
         },
         { status: 401 }
       );
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "No file provided",
+          error: "Không có file được cung cấp",
         },
         { status: 400 }
       );
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid file type. Only JPEG, PNG, and WebP are allowed.",
+          error: "Định dạng file không hợp lệ. Chỉ cho phép JPEG, PNG và WebP.",
         },
         { status: 400 }
       );
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "File size too large. Maximum size is 5MB.",
+          error: "Kích thước file quá lớn. Kích thước tối đa là 5MB.",
         },
         { status: 400 }
       );
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Avatar uploaded successfully",
+      message: "Ảnh đại diện đã được tải lên thành công",
       data: {
         avatarUrl,
       },
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to upload avatar",
+        error: "Đã xảy ra lỗi khi tải lên ảnh đại diện",
       },
       { status: 500 }
     );

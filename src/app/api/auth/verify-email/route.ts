@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Verification token is required",
+          error: "Token xác minh là bắt buộc",
         },
         { status: 400 }
       );
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid or expired verification token",
+          error: "Token xác minh không hợp lệ hoặc đã hết hạn",
         },
         { status: 400 }
       );
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: true,
-          message: "Email already verified",
+          message: "Email đã được xác minh",
           data: {
             email: user.email,
           },
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
         {
           success: false,
           error:
-            "Verification token has expired. A new verification email has been sent.",
+            "Token xác minh đã hết hạn. Một email xác minh mới đã được gửi.",
         },
         { status: 400 }
       );
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Email verified successfully",
+      message: "Email đã được xác minh thành công",
       data: {
         email: user.email,
       },
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to verify email",
+        error: "Đã xảy ra lỗi khi xác minh email",
       },
       { status: 500 }
     );

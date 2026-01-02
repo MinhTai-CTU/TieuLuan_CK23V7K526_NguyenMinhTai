@@ -1145,7 +1145,7 @@ const ShopDetails = () => {
                                   {item.title}
                                   {item.price && item.price > 0 && (
                                     <span className="text-blue ml-1">
-                                      (+${item.price.toFixed(2)})
+                                      (+{formatPrice(item.price)})
                                     </span>
                                   )}
                                 </span>

@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Email and password are required",
+          error: "Email và mật khẩu là bắt buộc",
         },
         { status: 400 }
       );
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid email or password",
+          error: "Email hoặc mật khẩu không chính xác",
         },
         { status: 401 }
       );
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            "Please verify your email before logging in. Check your inbox for the verification link.",
+            "Vui lòng xác minh email trước khi đăng nhập. Kiểm tra hộp thư đến của bạn để lấy liên kết xác minh.",
           requiresVerification: true,
         },
         { status: 403 }
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            "Your account has been banned. Please contact support for more information.",
+            "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hỗ trợ để biết thêm thông tin.",
           isBanned: true,
           bannedAt: user.bannedAt,
           bannedReason: user.bannedReason,
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     const cookieOptions = isProduction
       ? `Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`
       : `Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-    
+
     response.cookies.set("auth_token", token, {
       path: "/",
       maxAge: 7 * 24 * 60 * 60, // 7 days
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to login",
+        error: "Đã xảy ra lỗi khi đăng nhập",
       },
       { status: 500 }
     );
