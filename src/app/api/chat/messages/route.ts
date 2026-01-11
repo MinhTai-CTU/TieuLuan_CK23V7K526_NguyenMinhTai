@@ -96,9 +96,12 @@ export async function POST(request: NextRequest) {
       data: { lastMessageAt: new Date() },
     });
 
-    // Gửi real-time notification qua Pusher
+    // Gửi real-time notification qua Pusher nếu targetUserId là admin thì gửi vho người thường
+    // Nếu người gửi không phải admin gủi tin nhắn cho admin
+    // targetUserId chính là ID của người sẽ nhận tin nhắn.
     const targetUserId = isAdmin ? conversation.userId : conversation.adminId;
     if (targetUserId) {
+      // Gửi event realtime qua Pusher mỗi user sẽ có 1 channel riêng
       await pusherServer.trigger(`user-${targetUserId}`, "new-message", {
         conversationId,
         message,

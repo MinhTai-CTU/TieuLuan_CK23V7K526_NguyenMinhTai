@@ -35,6 +35,7 @@ interface Conversation {
 }
 
 export default function ChatWidget() {
+  const [isMounted, setIsMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -54,6 +55,10 @@ export default function ChatWidget() {
   const token = getToken();
   const isAdmin = user?.roles?.includes("ADMIN");
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -326,6 +331,8 @@ export default function ChatWidget() {
   const { data: unreadData } = useChatUnreadCountCustomer({
     enabled: !isAdmin && !!user,
   });
+
+  if (!isMounted) return null;
 
   const unreadCount = unreadData?.data?.unreadCount || 0;
 

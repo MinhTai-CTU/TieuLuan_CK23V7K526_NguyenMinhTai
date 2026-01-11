@@ -27,7 +27,6 @@ export default function AdminLayoutClient({
 
   useEffect(() => {
     const checkAuth = async () => {
-      // Get token and user from localStorage
       const token = getToken();
       const localUser = getUser();
 
@@ -45,7 +44,6 @@ export default function AdminLayoutClient({
         return;
       }
 
-      // Check if user has ADMIN role (only ADMIN can access /admin)
       const hasAdminRole =
         localUser.roles &&
         Array.isArray(localUser.roles) &&
@@ -63,7 +61,6 @@ export default function AdminLayoutClient({
         return;
       }
 
-      // Verify token is still valid by fetching user data from API
       try {
         const response = await fetch("/api/auth/me", {
           headers: {
@@ -72,6 +69,7 @@ export default function AdminLayoutClient({
         });
 
         const data = await response.json();
+        console.log(data);
 
         if (!data.success || !data.data.user) {
           // Token invalid, redirect to signin
@@ -81,13 +79,11 @@ export default function AdminLayoutClient({
 
         const apiUser = data.data.user;
 
-        // Check if user is still active
         if (!apiUser.isActive) {
           router.push("/signin?redirect=/admin");
           return;
         }
 
-        // Check if user still has ADMIN role
         const apiHasAdminRole =
           apiUser.roles &&
           Array.isArray(apiUser.roles) &&

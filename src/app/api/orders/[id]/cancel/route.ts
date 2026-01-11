@@ -54,7 +54,7 @@ export async function POST(
       );
     }
 
-    // Check if user owns this order
+    // Kiểm tra xem người dùng có phải là chủ của đơn hàng này hay không
     if (order.userId !== decoded.userId) {
       return NextResponse.json(
         {
@@ -65,8 +65,7 @@ export async function POST(
       );
     }
 
-    // Check if order can be cancelled
-    // Only allow cancellation if status is PENDING and payment is not PAID
+    //Kiểm tra xem đơn hàng có thể bị hủy hay không — chỉ cho phép hủy nếu trạng thái là PENDING và chưa được thanh toán.
     if (order.status !== "PENDING") {
       return NextResponse.json(
         {
@@ -99,7 +98,7 @@ export async function POST(
       },
     });
 
-    // Decrease promotion usedCount if order had a promotion code
+    // Khi xử lý (thường là hủy đơn), nếu đơn hàng đã dùng voucher, thì cần hoàn lại 1 lượt sử dụng voucher.
     if (promotionCode) {
       const promotion = await prisma.promotion.findUnique({
         where: { code: promotionCode.toUpperCase() },

@@ -1,12 +1,14 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import {
   Product,
   ProductImages,
   ProductAttributes,
   ProductAdditionalInfo,
 } from "@/types/product";
+
+// --- Types Definitions ---
 
 type ProductImageResponse = {
   url: string;
@@ -47,14 +49,14 @@ type ProductsResponse = {
   total: number;
 };
 
-type UseProductsOptions = {
+export type UseProductsOptions = {
   limit?: number;
   offset?: number;
   categoryId?: string;
   search?: string;
   minPrice?: number;
   maxPrice?: number;
-  sort?: string; // e.g. "newest", "bestseller", "oldest"
+  sort?: string;
 };
 
 const mapImages = (images: ProductImageResponse[]): ProductImages => {
@@ -90,12 +92,17 @@ const fetchProducts = async ({
   sort,
 }: UseProductsOptions): Promise<{ products: Product[]; total: number }> => {
   const params = new URLSearchParams();
+
   if (limit) params.append("limit", limit.toString());
   if (offset !== undefined) params.append("offset", offset.toString());
   if (categoryId) params.append("categoryId", categoryId);
   if (search) params.append("search", search);
-  if (minPrice !== undefined) params.append("minPrice", minPrice.toString());
-  if (maxPrice !== undefined) params.append("maxPrice", maxPrice.toString());
+
+  if (minPrice !== undefined && minPrice !== null)
+    params.append("minPrice", minPrice.toString());
+  if (maxPrice !== undefined && maxPrice !== null)
+    params.append("maxPrice", maxPrice.toString());
+
   if (sort) params.append("sort", sort);
 
   const queryString = params.toString();
@@ -111,36 +118,39 @@ const fetchProducts = async ({
   }
 
   const json = (await response.json()) as ProductsResponse;
+
   if (!json.success) {
     throw new Error("Products response returned unsuccessful flag");
   }
 
-  return {
-    products: json.data.map((product) => ({
-      id: product.id,
-      title: product.title,
-      slug: product.slug,
-      description: product.description,
-      reviews: product.reviews ?? 0,
-      price: product.price,
-      discountedPrice: product.discountedPrice ?? product.price,
-      stock: product.stock,
-      hasVariants: product.hasVariants ?? false,
-      categoryId: product.categoryId,
-      attributes: product.attributes as ProductAttributes | null,
-      additionalInfo: product.additionalInfo as ProductAdditionalInfo | null,
-      imgs: mapImages(product.images ?? []),
-      variants: product.variants?.map((v) => ({
-        id: v.id,
-        productId: v.productId,
-        price: v.price,
-        discountedPrice: v.discountedPrice,
-        stock: v.stock,
-        sku: v.sku,
-        options: v.options,
-        image: v.image,
-      })),
+  const mappedProducts: Product[] = json.data.map((product) => ({
+    id: product.id,
+    title: product.title,
+    slug: product.slug,
+    description: product.description,
+    reviews: product.reviews ?? 0,
+    price: product.price,
+    discountedPrice: product.discountedPrice ?? product.price,
+    stock: product.stock,
+    hasVariants: product.hasVariants ?? false,
+    categoryId: product.categoryId,
+    attributes: product.attributes as ProductAttributes | null,
+    additionalInfo: product.additionalInfo as ProductAdditionalInfo | null,
+    imgs: mapImages(product.images ?? []),
+    variants: product.variants?.map((v) => ({
+      id: v.id,
+      productId: v.productId,
+      price: v.price,
+      discountedPrice: v.discountedPrice,
+      stock: v.stock,
+      sku: v.sku,
+      options: v.options,
+      image: v.image,
     })),
+  }));
+
+  return {
+    products: mappedProducts,
     total: json.total,
   };
 };
@@ -149,5 +159,7 @@ export const useProducts = (options: UseProductsOptions = {}) => {
   return useQuery({
     queryKey: ["products", options],
     queryFn: () => fetchProducts(options),
+
+    placeholderData: keepPreviousData,
   });
 };

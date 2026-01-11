@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import RangeSlider from "react-range-slider-input";
-import "react-range-slider-input/dist/style.css";
 
 interface PriceDropdownProps {
   minPrice?: number;
@@ -14,68 +12,49 @@ const PriceDropdown = ({
   onPriceChange,
 }: PriceDropdownProps) => {
   const [toggleDropdown, setToggleDropdown] = useState(true);
+  const [tempMin, setTempMin] = useState<string>(minPrice.toString());
+  const [tempMax, setTempMax] = useState<string>(maxPrice.toString());
 
-  const [selectedPrice, setSelectedPrice] = useState({
-    from: minPrice,
-    to: maxPrice,
-  });
-
-  // Update when minPrice/maxPrice change (only update 'to' if maxPrice changes)
   useEffect(() => {
-    setSelectedPrice((prev) => ({
-      from: minPrice, // Always start from minPrice (should be 0)
-      to: maxPrice, // Update to new maxPrice
-    }));
+    setTempMin(minPrice.toString());
+    setTempMax(maxPrice.toString());
   }, [minPrice, maxPrice]);
 
-  // Handle input change with validation
-  const handleInputChange = (field: "from" | "to", value: string) => {
-    // Remove all non-numeric characters
-    const numericValue = value.replace(/[^0-9]/g, "");
+  const formatCurrency = (value: string) => {
+    if (!value) return "";
+    const number = parseInt(value.replace(/[^0-9]/g, ""), 10);
+    if (isNaN(number)) return "";
+    return number.toLocaleString("vi-VN");
+  };
 
-    if (numericValue === "") {
-      setSelectedPrice((prev) => ({
-        ...prev,
-        [field]: 0,
-      }));
-      return;
-    }
-
-    const numValue = parseInt(numericValue, 10);
-
-    // Ensure non-negative
-    if (numValue < 0) {
-      return;
-    }
-
-    if (field === "from") {
-      // Ensure 'from' is less than 'to'
-      const newFrom = Math.min(numValue, selectedPrice.to - 1);
-      setSelectedPrice((prev) => ({
-        ...prev,
-        from: newFrom,
-      }));
-      onPriceChange?.(newFrom, selectedPrice.to);
+  const handleInputChange = (type: "min" | "max", value: string) => {
+    const rawValue = value.replace(/[^0-9]/g, "");
+    if (type === "min") {
+      setTempMin(rawValue);
     } else {
-      // Ensure 'to' is greater than 'from'
-      const newTo = Math.max(numValue, selectedPrice.from + 1);
-      setSelectedPrice((prev) => ({
-        ...prev,
-        to: newTo,
-      }));
-      onPriceChange?.(selectedPrice.from, newTo);
+      setTempMax(rawValue);
     }
   };
 
-  // Handle slider change
-  const handleSliderChange = (values: number[]) => {
-    const newFrom = Math.floor(values[0]);
-    const newTo = Math.ceil(values[1]);
-    setSelectedPrice({
-      from: newFrom,
-      to: newTo,
-    });
-    onPriceChange?.(newFrom, newTo);
+  const handleApplyFilter = () => {
+    let newMin = parseInt(tempMin.replace(/[^0-9]/g, ""), 10) || 0;
+    let newMax = parseInt(tempMax.replace(/[^0-9]/g, ""), 10) || 0;
+
+    // Logic: Nếu Min > Max, tự động đổi chỗ
+    if (newMin > newMax && newMax !== 0) {
+      const temp = newMin;
+      newMin = newMax;
+      newMax = temp;
+      setTempMin(newMin.toString());
+      setTempMax(newMax.toString());
+    }
+
+    if (newMax === 0) newMax = 100000000;
+
+    console.log("Đã nhấn Áp dụng. Giá trị:", newMin, newMax); // Kiểm tra log
+
+    // Gọi hàm từ cha để kích hoạt API
+    onPriceChange?.(newMin, newMax);
   };
 
   return (
@@ -84,11 +63,14 @@ const PriceDropdown = ({
         onClick={() => setToggleDropdown(!toggleDropdown)}
         className="cursor-pointer flex items-center justify-between py-3 pl-6 pr-5.5"
       >
-        <p className="text-dark">Giá</p>
+        <p className="text-dark font-medium">Khoảng giá</p>
         <button
-          onClick={() => setToggleDropdown(!toggleDropdown)}
-          id="price-dropdown-btn"
-          aria-label="button for price dropdown"
+          // QUAN TRỌNG: Phải có type="button" để không trigger form submit ở cha
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setToggleDropdown(!toggleDropdown);
+          }}
           className={`text-dark ease-out duration-200 ${
             toggleDropdown && "rotate-180"
           }`}
@@ -111,78 +93,53 @@ const PriceDropdown = ({
         </button>
       </div>
 
-      {/* // <!-- dropdown menu --> */}
-      <div className={`p-6 ${toggleDropdown ? "block" : "hidden"}`}>
-        <div id="pricingOne">
-          <div className="price-range">
-            <RangeSlider
-              id="range-slider-gradient"
-              className="margin-lg"
-              min={minPrice}
-              max={maxPrice}
-              value={[selectedPrice.from, selectedPrice.to]}
-              step={1000}
-              onInput={handleSliderChange}
-            />
-
-            <div className="price-amount flex items-center justify-between pt-4 gap-3">
-              <div className="text-custom-xs text-dark-4 flex rounded border border-gray-3/80 flex-1">
-                <span className="block border-r border-gray-3/80 px-2.5 py-1.5">
-                  ₫
-                </span>
-                <input
-                  type="text"
-                  id="minAmount"
-                  value={selectedPrice.from.toLocaleString("vi-VN")}
-                  onChange={(e) => {
-                    const rawValue = e.target.value.replace(/[^0-9]/g, "");
-                    handleInputChange("from", rawValue);
-                  }}
-                  onBlur={(e) => {
-                    const rawValue = e.target.value.replace(/[^0-9]/g, "");
-                    const numValue = parseInt(rawValue, 10) || 0;
-                    if (numValue >= selectedPrice.to) {
-                      handleInputChange(
-                        "from",
-                        (selectedPrice.to - 1).toString()
-                      );
-                    }
-                  }}
-                  className="block px-3 py-1.5 w-full outline-none"
-                  placeholder="0"
-                />
-              </div>
-
-              <span className="text-dark-4">-</span>
-
-              <div className="text-custom-xs text-dark-4 flex rounded border border-gray-3/80 flex-1">
-                <span className="block border-r border-gray-3/80 px-2.5 py-1.5">
-                  ₫
-                </span>
-                <input
-                  type="text"
-                  id="maxAmount"
-                  value={selectedPrice.to.toLocaleString("vi-VN")}
-                  onChange={(e) => {
-                    const rawValue = e.target.value.replace(/[^0-9]/g, "");
-                    handleInputChange("to", rawValue);
-                  }}
-                  onBlur={(e) => {
-                    const rawValue = e.target.value.replace(/[^0-9]/g, "");
-                    const numValue = parseInt(rawValue, 10) || maxPrice;
-                    if (numValue <= selectedPrice.from) {
-                      handleInputChange(
-                        "to",
-                        (selectedPrice.from + 1).toString()
-                      );
-                    }
-                  }}
-                  className="block px-3 py-1.5 w-full outline-none"
-                  placeholder={maxPrice.toLocaleString("vi-VN")}
-                />
-              </div>
+      <div className={`px-6 pb-6 pt-2 ${toggleDropdown ? "block" : "hidden"}`}>
+        <div className="flex flex-col gap-4">
+          <div>
+            <label
+              htmlFor="minPrice"
+              className="text-sm text-gray-500 mb-1 block"
+            >
+              Từ (đ)
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                id="minPrice"
+                value={formatCurrency(tempMin)}
+                onChange={(e) => handleInputChange("min", e.target.value)}
+                placeholder="0"
+                className="w-full rounded-md border border-gray-3 bg-white py-2 pl-3 pr-3 text-dark outline-none focus:border-blue transition disabled:cursor-default disabled:bg-whiter"
+              />
             </div>
           </div>
+
+          <div>
+            <label
+              htmlFor="maxPrice"
+              className="text-sm text-gray-500 mb-1 block"
+            >
+              Đến (đ)
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                id="maxPrice"
+                value={formatCurrency(tempMax)}
+                onChange={(e) => handleInputChange("max", e.target.value)}
+                placeholder="Ví dụ: 10.000.000"
+                className="w-full rounded-md border border-gray-3 bg-white py-2 pl-3 pr-3 text-dark outline-none focus:border-blue transition disabled:cursor-default disabled:bg-whiter"
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleApplyFilter}
+            className="w-full mt-2 cursor-pointer rounded-md bg-blue py-2 px-4 text-center font-medium text-white hover:bg-opacity-90 transition"
+          >
+            Áp dụng
+          </button>
         </div>
       </div>
     </div>

@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Debug: Log orders to check estimatedDeliveryDate
+    // In ra (log) danh sách đơn hàng để kiểm tra trường estimatedDeliveryDate
     if (orders.length > 0) {
       console.log("📋 Orders fetched from DB:", orders.length);
       orders.forEach((order, index) => {

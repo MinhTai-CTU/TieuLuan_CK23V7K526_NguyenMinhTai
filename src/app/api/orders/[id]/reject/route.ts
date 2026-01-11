@@ -56,7 +56,7 @@ export async function POST(
       );
     }
 
-    // Only reject PENDING orders with COD payment method
+    // Chỉ có thể từ chối đơn khi chưa thanh toán
     if (order.status !== "PENDING") {
       return NextResponse.json(
         {
@@ -77,7 +77,7 @@ export async function POST(
       );
     }
 
-    // Require cancellation reason
+    // Lý do hủy đơn
     if (!reason || reason.trim().length === 0) {
       return NextResponse.json(
         {
@@ -88,11 +88,11 @@ export async function POST(
       );
     }
 
-    // Get promotionCode before update
+    // Lấy mã khuyến mãi trước khi cập nhật
     const promotionCode = order.promotionCode;
     const wasAlreadyCancelled = (order.status as string) === "CANCELLED";
 
-    // Update order status to CANCELLED (rejected) and save cancellation reason
+    // Cập nhật trạng thái đơn hàng thành CANCELLED (bị từ chối) và lưu lý do hủy đơn.”
     const updatedOrder = await prisma.order.update({
       where: { id },
       data: {
@@ -117,7 +117,7 @@ export async function POST(
       },
     });
 
-    // Decrease promotion usedCount if order had a promotion code and wasn't already cancelled
+    // Giảm số lần sử dụng của mã khuyến mãi nếu đơn hàng có áp dụng mã khuyến mãi và trước đó chưa bị hủy.
     if (promotionCode && !wasAlreadyCancelled) {
       const promotion = await prisma.promotion.findUnique({
         where: { code: promotionCode.toUpperCase() },
@@ -166,7 +166,7 @@ export async function POST(
       },
     });
 
-    // Send notification to customer about order rejection
+    // Gửi thông báo khách hàng
     try {
       if (finalOrder.user?.id) {
         await createNotification({

@@ -389,11 +389,6 @@ const MyAccount = () => {
                 </div>
               </div>
             </div>
-            {/* <!--== user dashboard menu end ==-->
-
-            
-          <!--== user dashboard content start ==--> */}
-            {/* <!-- dashboard tab content start --> */}
 
             <div
               className={`xl:max-w-[970px] w-full bg-white rounded-xl shadow-1 py-9.5 px-4 sm:px-7.5 xl:px-10 ${
@@ -402,9 +397,7 @@ const MyAccount = () => {
             >
               <DashboardStats />
             </div>
-            {/* <!-- dashboard tab content end -->
 
-          <!-- orders tab content start --> */}
             <div
               className={`xl:max-w-[970px] w-full bg-white rounded-xl shadow-1 ${
                 activeTab === "orders" ? "block" : "hidden"
@@ -412,10 +405,7 @@ const MyAccount = () => {
             >
               <Orders />
             </div>
-            {/* <!-- orders tab content end -->
 
-
-          <!-- addresses tab content start --> */}
             <div
               className={`xl:max-w-[970px] w-full ${
                 activeTab === "addresses" ? "block" : "hidden"

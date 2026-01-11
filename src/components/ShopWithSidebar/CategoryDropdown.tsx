@@ -48,7 +48,11 @@ const CategoryItem = ({ category, isSelected, onCategoryClick }) => {
   );
 };
 
-const CategoryDropdown = ({ categories, onCategoryClick, selectedCategoryId }) => {
+const CategoryDropdown = ({
+  categories,
+  onCategoryClick,
+  selectedCategoryId,
+}) => {
   const [toggleDropdown, setToggleDropdown] = useState(true);
 
   return (
@@ -95,9 +99,9 @@ const CategoryDropdown = ({ categories, onCategoryClick, selectedCategoryId }) =
         }`}
       >
         {categories.map((category, key) => (
-          <CategoryItem 
-            key={key} 
-            category={category} 
+          <CategoryItem
+            key={key}
+            category={category}
             isSelected={selectedCategoryId === category.id}
             onCategoryClick={onCategoryClick}
           />

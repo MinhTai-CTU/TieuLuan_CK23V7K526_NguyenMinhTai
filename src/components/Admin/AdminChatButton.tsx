@@ -16,12 +16,10 @@ export default function AdminChatButton() {
     setIsAdmin(user?.roles?.includes("ADMIN") || false);
   }, []);
 
-  // Chỉ gọi hook khi đã mount và là admin
   const { data: chatUnreadData } = useChatUnreadCount({
     enabled: mounted && isAdmin,
   });
 
-  // Chỉ hiển thị sau khi mount và user là admin
   if (!mounted || !isAdmin) return null;
 
   const handleClick = () => {

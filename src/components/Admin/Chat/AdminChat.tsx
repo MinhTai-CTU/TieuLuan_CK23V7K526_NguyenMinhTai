@@ -113,7 +113,7 @@ export default function AdminChat() {
   // Initialize Pusher
   useEffect(() => {
     if (!user || !token) return;
-
+    // giữ instance không bị tạo lại mỗi lần render
     if (!pusherRef.current) {
       pusherRef.current = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || "", {
         cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "ap1",
@@ -121,6 +121,7 @@ export default function AdminChat() {
     }
 
     if (!channelRef.current) {
+      // Admin lắng nghe channel chung admin-chat
       channelRef.current = pusherRef.current.subscribe("admin-chat");
 
       channelRef.current.bind("new-message", async (data: any) => {

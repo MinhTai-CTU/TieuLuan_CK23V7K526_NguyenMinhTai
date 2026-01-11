@@ -80,7 +80,7 @@ export async function POST(
       );
     }
 
-    // For prepaid orders, must be PAID before approval
+    //Nếu không phải COD (tức là chuyển khoản/thẻ) thì bắt buộc phải PAID (Đã thanh toán) mới được duyệt
     if (order.paymentMethod && order.paymentMethod !== "cod") {
       if (order.paymentStatus !== "PAID") {
         return NextResponse.json(
@@ -105,10 +105,10 @@ export async function POST(
       );
     }
 
-    // Check stock availability for each item
+    // Kiểm tra tình trạng còn hàng của từng mặt hàng.
     for (const item of order.items) {
       if (item.productVariantId) {
-        // Check variant stock
+        // Kiểm tra kho biến thể
         const variant = await prisma.productVariant.findUnique({
           where: { id: item.productVariantId },
         });
@@ -122,7 +122,7 @@ export async function POST(
           );
         }
       } else {
-        // Check product stock
+        // Kiểm tra kho sản phẩm
         if (item.product.stock < item.quantity) {
           return NextResponse.json(
             {
@@ -135,7 +135,7 @@ export async function POST(
       }
     }
 
-    // Update order status to PROCESSING (approved)
+    // Cập nhật trạng thái đơn hàng thành ĐANG XỬ LÝ (đã duyệt)
     const updatedOrder = await prisma.order.update({
       where: { id },
       data: {
@@ -159,10 +159,10 @@ export async function POST(
       },
     });
 
-    // Deduct stock for each item
+    // Giảm số lượng hàng tồn kho cho mỗi mặt hàng
     for (const item of order.items) {
       if (item.productVariantId) {
-        // Deduct variant stock
+        // Trừ hàng tồn kho biến thể
         await prisma.productVariant.update({
           where: { id: item.productVariantId },
           data: {
@@ -184,7 +184,7 @@ export async function POST(
       }
     }
 
-    // Send notification to customer about order approval
+    // Gửi thông báo cho khách hàng về việc đơn hàng đã được phê duyệt.
     try {
       if (updatedOrder.user?.id) {
         await createNotification({
@@ -194,11 +194,14 @@ export async function POST(
           message: `Đơn hàng ${updatedOrder.orderId} đã được duyệt và đang được chuẩn bị`,
           orderId: updatedOrder.id,
         });
-        console.log("✅ Notification sent to customer:", updatedOrder.user.email);
+        console.log(
+          "✅ Notification sent to customer:",
+          updatedOrder.user.email
+        );
       }
     } catch (notificationError) {
       console.error("Error sending notification:", notificationError);
-      // Don't fail the order approval if notification fails
+      // đơn hàng bị từ chối nếu thông báo không thành công.
     }
 
     return NextResponse.json({

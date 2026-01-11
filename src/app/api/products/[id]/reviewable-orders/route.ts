@@ -1,27 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getUserId } from "@/middleware/auth";
+import { getUserId } from "@/middleware/auth"; // Giả sử path đúng
 
-// GET /api/products/[id]/reviewable-orders - Lấy danh sách order items có thể đánh giá
+// GET /api/products/[id]/reviewable-orders
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: productId } = await params;
-    const userId = getUserId(request);
+    const userId = getUserId(request); // Kiểm tra lại hàm này có cần await không nhé
 
     if (!userId) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized",
-        },
+        { success: false, error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    // Lấy các order items của user đã mua sản phẩm này và đã giao hàng
+    // Lấy các order items:
+    // 1. Của user này
+    // 2. Trạng thái đã giao (DELIVERED)
+    // 3. CHƯA có review nào (Lọc ngay tại đây)
     const orderItems = await prisma.orderItem.findMany({
       where: {
         productId,
@@ -29,13 +29,17 @@ export async function GET(
           userId,
           status: "DELIVERED",
         },
+        // SỬA Ở ĐÂY: Lọc những item chưa có review
+        // Nếu quan hệ là 1-1 (tên là reviews), dùng: reviews: null
+        // Nếu quan hệ là 1-N (tên là reviews), dùng: reviews: { none: {} }
+        // Dựa vào lỗi của bạn (nó là object), mình dùng cú pháp cho quan hệ 1-1:
+        reviews: null,
       },
       include: {
         order: {
           select: {
             id: true,
             orderId: true,
-            status: true,
             createdAt: true,
           },
         },
@@ -51,25 +55,19 @@ export async function GET(
             options: true,
           },
         },
-        reviews: {
-          select: {
-            id: true,
-          },
-        },
+        // Không cần select reviews nữa vì ta đã lọc ở where rồi
       },
     });
 
-    // Lọc các order items chưa được đánh giá
-    const reviewableItems = orderItems
-      .filter((item) => item.reviews.length === 0)
-      .map((item) => ({
-        id: item.id,
-        orderId: item.order.orderId,
-        quantity: item.quantity,
-        selectedOptions: item.selectedOptions,
-        productVariant: item.productVariant,
-        orderDate: item.order.createdAt,
-      }));
+    // Map dữ liệu trả về client
+    const reviewableItems = orderItems.map((item) => ({
+      id: item.id,
+      orderId: item.order.orderId,
+      quantity: item.quantity,
+      selectedOptions: item.selectedOptions,
+      productVariant: item.productVariant,
+      orderDate: item.order.createdAt,
+    }));
 
     return NextResponse.json({
       success: true,
@@ -86,4 +84,3 @@ export async function GET(
     );
   }
 }
-

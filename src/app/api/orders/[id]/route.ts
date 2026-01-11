@@ -79,7 +79,7 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    // Get current order to check payment method
+    // Lấy trạng thái hiện tại của đơn hàng
     const currentOrder = await prisma.order.findUnique({
       where: { id },
       select: {
@@ -96,7 +96,7 @@ export async function PATCH(
       );
     }
 
-    // Validate status transition - chỉ cho phép chuyển sang bước tiếp theo
+    // Validate luồng trạng thái - chỉ cho phép chuyển sang bước tiếp theo
     const validNextStatuses: Record<string, string[]> = {
       PENDING: ["PROCESSING", "CANCELLED"], // Chỉ có thể chuyển sang Đang chuẩn bị hoặc Hủy
       PROCESSING: ["SHIPPED", "CANCELLED"], // Chỉ có thể chuyển sang Đang giao hàng hoặc Hủy
@@ -109,7 +109,6 @@ export async function PATCH(
 
     // Cho phép giữ nguyên trạng thái hiện tại
     if (body.status === currentOrder.status) {
-      // OK, giữ nguyên
     } else if (!allowedStatuses.includes(body.status)) {
       const statusLabels: Record<string, string> = {
         PENDING: "Chờ xử lý",
@@ -132,7 +131,7 @@ export async function PATCH(
       status: body.status,
     };
 
-    // Theo quy trình: Khi đơn hàng DELIVERED và là COD → cập nhật paymentStatus = PAID
+    // Khi đơn hàng DELIVERED(đã giao) và là COD → cập nhật paymentStatus = PAID
     if (body.status === "DELIVERED" && currentOrder.paymentMethod === "cod") {
       if (currentOrder.paymentStatus === "PENDING") {
         updateData.paymentStatus = "PAID";
